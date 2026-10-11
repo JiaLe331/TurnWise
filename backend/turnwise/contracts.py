@@ -76,6 +76,7 @@ class TableSession(BaseModel):
     seated_at: datetime | None
     departed_at: datetime | None
     ready_at: datetime | None
+    manual: bool = False
 
 
 class ClearingTask(BaseModel):
@@ -132,3 +133,60 @@ class AuditEvent(BaseModel):
 class ApiError(BaseModel):
     code: str
     message: str
+
+
+class ActorType(StrEnum):
+    HUMAN = "human"
+    MODEL = "model"
+    SYSTEM = "system"
+
+
+class Actor(BaseModel):
+    actor_id: str
+    actor_type: ActorType = ActorType.HUMAN
+    role: UserRole | None = None
+
+
+class TableAction(StrEnum):
+    REQUEST_DEPARTURE_REVIEW = "request_departure_review"
+    DISMISS_REVIEW = "dismiss_review"
+    CONFIRM_DEPARTURE = "confirm_departure"
+    MARK_READY = "mark_ready"
+    OVERRIDE_STATE = "override_state"
+    RELEASE_OVERRIDE = "release_override"
+    BLOCK = "block"
+    UNBLOCK = "unblock"
+
+
+class TaskAction(StrEnum):
+    CLAIM = "claim"
+    START = "start"
+    RELEASE = "release"
+    COMPLETE = "complete"
+    CANCEL = "cancel"
+
+
+class TableActionRequest(BaseModel):
+    action: TableAction
+    expected_version: int | None = None
+    reason: str | None = None
+    target_state: OperationalState | None = None
+
+
+class TaskActionRequest(BaseModel):
+    action: TaskAction
+    expected_version: int | None = None
+    reason: str | None = None
+
+
+class TableBoardEntry(BaseModel):
+    table: Table
+    session: TableSession
+    task: ClearingTask | None
+
+
+class Board(BaseModel):
+    outlet_id: str
+    generated_at: datetime
+    tables: list[TableBoardEntry]
+    clearing_queue: list[TableBoardEntry]
