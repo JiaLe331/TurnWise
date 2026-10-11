@@ -1,0 +1,14 @@
+{
+  "name": "turnwise",
+  "private": true,
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "dev:web": "pnpm --filter @turnwise/web dev",
+    "typecheck": "pnpm --filter @turnwise/web typecheck",
+    "build": "pnpm --filter @turnwise/web build",
+    "emulators": "firebase emulators:start --only auth,firestore"
+  },
+  "devDependencies": {
+    "firebase-tools": "^15.33.0"
+  }
+}

@@ -1,0 +1,6 @@
+packages:
+  - apps/*
+
+allowBuilds:
+  protobufjs: false
+  re2: true

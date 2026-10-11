@@ -1,0 +1,14 @@
+node_modules/
+.pnpm-store/
+dist/
+.venv/
+.env
+.env.local
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.pyc
