@@ -25,7 +25,7 @@ uv sync
 uv run uvicorn turnwise.api.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Open `http://localhost:5173`. The app shows the API connection status and placeholder views for each role. The API exposes `GET /healthz` and interactive documentation at `http://127.0.0.1:8000/docs`. No operational endpoints are active.
+Open `http://localhost:5173`. The app shows the API connection status and placeholder views for each role. The API exposes `GET /healthz` and interactive documentation at `http://127.0.0.1:8000/docs`. The manual table workflow is active against a seeded in-memory outlet (`demo-outlet`, 12 tables, reset on restart): `GET /outlets/{id}/board`, `POST /tables/{id}/actions` and `POST /tasks/{id}/actions`. Mutations need an `Idempotency-Key` header and, until Firebase Auth is added, `X-Actor-Id` and `X-Actor-Role` (`host`, `floor_staff`, `manager`) headers. Waitlist, recommendations, holds and observations are not exposed yet.
 
 The separate worker HTTP shell can be started with `uv run uvicorn turnwise.worker.main:app --host 127.0.0.1 --port 8001` from `backend`. It only exposes a health endpoint. The gateway entrypoint (`uv run python -m turnwise.gateway`) exits with an explicit not-implemented message until capture is built.
 
@@ -54,6 +54,7 @@ uv run ruff check .
 | Path | Purpose |
 | --- | --- |
 | `apps/web` | Host, floor staff, and manager web shell |
+| `backend/turnwise/domain` | Table, task, and audit rules behind a repository interface (in-memory for now) |
 | `backend/turnwise/api` | FastAPI HTTP entrypoint and future PRD route modules |
 | `backend/turnwise/gateway` | Future on-site frame capture boundary |
 | `backend/turnwise/worker` | Future observation interpretation boundary |
