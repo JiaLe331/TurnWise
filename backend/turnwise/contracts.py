@@ -326,3 +326,33 @@ class SeatingResult(BaseModel):
     hold: SeatingHold
     party: QueueParty
     table: TableBoardEntry
+
+
+class MetricSummary(BaseModel):
+    metric: str
+    count: int
+    median_s: float | None
+    p90_s: float | None
+
+
+class CycleRow(BaseModel):
+    metric: str
+    table_id: str | None
+    party_id: str | None
+    session_id: str | None
+    started_at: datetime
+    ended_at: datetime
+    seconds: float
+
+
+class ShiftMetrics(BaseModel):
+    outlet_id: str
+    window_start: datetime
+    window_end: datetime
+    generated_at: datetime
+    durations: list[MetricSummary]
+    queue_wait_by_size: dict[int, MetricSummary]
+    counts: dict[str, int]
+    vision_review_correction_rate: float | None
+    cycles: list[CycleRow]
+    notes: list[str]
