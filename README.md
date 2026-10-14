@@ -14,16 +14,10 @@ The web app and API start without a Firebase project or cloud credentials. The F
 
 ```sh
 pnpm install
-pnpm dev:web
+pnpm dev
 ```
 
-In another terminal:
-
-```sh
-cd backend
-uv sync
-uv run uvicorn turnwise.api.main:app --reload --host 127.0.0.1 --port 8000
-```
+`pnpm dev` starts the API on port 8000 and the web app on port 5173 together, with both logs in one terminal; Ctrl+C stops both. `uv run` installs the Python dependencies on first use. To run one side on its own, use `pnpm dev:api` or `pnpm dev:web`. Restarting the API resets the demo data.
 
 Open `http://localhost:5173`. The app shows the API connection status and placeholder views for each role. The API exposes `GET /healthz` and interactive documentation at `http://127.0.0.1:8000/docs`. The manual table workflow is active against a seeded in-memory outlet (`demo-outlet`, 12 tables, reset on restart): `GET /outlets/{id}/board`, `POST /tables/{id}/actions` and `POST /tasks/{id}/actions`. Mutations need an `Idempotency-Key` header and, until Firebase Auth is added, `X-Actor-Id` and `X-Actor-Role` (`host`, `floor_staff`, `manager`) headers. Waitlist, recommendations, holds and observations are not exposed yet.
 

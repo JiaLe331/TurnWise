@@ -3,7 +3,9 @@
   "private": true,
   "packageManager": "pnpm@11.25.0",
   "scripts": {
+    "dev": "pnpm run \"/^dev:(web|api)$/\"",
     "dev:web": "pnpm --filter @turnwise/web dev",
+    "dev:api": "cd backend && uv run uvicorn turnwise.api.main:app --reload --host 127.0.0.1 --port 8000",
     "typecheck": "pnpm --filter @turnwise/web typecheck",
     "build": "pnpm --filter @turnwise/web build",
     "emulators": "firebase emulators:start --only auth,firestore"
