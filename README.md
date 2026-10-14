@@ -73,3 +73,15 @@ The next implementation stage is the PRD's manual workflow: authentication and o
 ## Demo deployment
 
 See [deploy/README.md](deploy/README.md): one AWS server running the API (Firestore persistence, `TURNWISE_STORAGE=firestore`) and the web app behind Caddy, with no sign-in (the build sets `VITE_DEMO_IDENTITY=true` so the persona switcher works in production).
+
+## Live demo (`/demo`)
+
+The landing page's **Watch the live demo** opens a self-contained demo built on a stock time-lapse of a real dining room (Mixkit 4385). Each browser tab gets its own isolated session under `/api/demo`; the video player drives a demo clock (20 simulated seconds per media second), and a precomputed timeline replays detections, smoothed table states and Gemini table checks through the normal observation rules. Nothing touches the live outlet.
+
+- **Modes:** *Autoplay walkthrough* lets a server-side autopilot act as staff and host at the moments the footage shows (T3 turnover, T2 departure and reset, the party of six seated at T4), with captions. *Guided* pauses on each camera or Gemini event so the viewer acts as host, floor staff or manager. Modes can be switched while playing.
+- **Views:** the footage with table-zone overlays, a 3D floor and a 2D *Live host floor* plan built to the room's shape (bar, banquette, table column), the AI guide, and host, staff and manager panels with the Gemini briefing, efficiency ideas and ask-the-shift.
+- **Video file (not in git, per the Mixkit licence):** create it once with
+  `ffmpeg -i backend/recordings/mixkit-minimalist-restaurant-4385.mp4 -vf "scale=1280:720,minterpolate=fps=96:mi_mode=mci:mc_mode=aobmc:vsbmc=1" -c:v libx264 -preset slow -crf 24 -pix_fmt yuv420p -an -movflags +faststart apps/web/public/demo-media/mixkit-720p.mp4`
+  (download the source clip from https://mixkit.co/free-stock-video/customers-in-a-minimalist-style-restaurant-4385/ into `backend/recordings/`).
+- **Timeline:** `backend/demo/mixkit-timeline.json` is committed. Regenerate it with `uv run --group vision python scripts/build_demo_timeline.py` from `backend` (needs `GEMINI_API_KEY` for the table checks).
+- **Gemini:** set `GEMINI_API_KEY` in `.env`. Calls fall back across several Flash models and fail soft with a "Gemini is busy" message when every model is over quota.

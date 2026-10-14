@@ -17,6 +17,11 @@ from turnwise.domain.errors import DomainError
 from turnwise.domain.metrics import shift_metrics
 
 PROMPT_VERSION = "shift-briefing-v1"
+CHECK_LABEL = {
+    "clear_and_set": "clean and set for the next guests (nothing to do)",
+    "leftovers": "items left behind that staff should remove",
+    "unclear": "too blurry to judge",
+}
 CACHE_S = 120
 PROMPT = (
     "You are the shift assistant for a casual-dining restaurant manager. Using ONLY the JSON facts "
@@ -91,14 +96,20 @@ INSIGHTS_PROMPT = (
     "propose up to 4 concrete changes that would reduce the time between guests leaving and the "
     "next party being seated (clearing speed, task ownership, seating order, table mix, camera "
     "coverage). For each give the evidence from the facts, the expected impact phrased as a "
-    "hypothesis to measure, and the effort. If data is sparse, say so in the evidence and keep "
-    "recommendations modest. Never invent numbers."
+    "hypothesis to measure (no percentages or numeric targets unless they appear in the facts), "
+    "and the effort. If data is sparse, say so in the evidence and keep recommendations modest. "
+    "Never invent numbers."
 )
 
 
 class AiUnavailable(DomainError):
     status_code = 503
     code = "ai_unavailable"
+
+    def __init__(self, what: str) -> None:
+        super().__init__(
+            f"{what} is unavailable: Gemini is busy or over quota right now. Try again in a minute."
+        )
 
 
 def _minutes(seconds: float | None) -> float | None:
@@ -137,10 +148,12 @@ def briefing_facts(ctx: Context, start: datetime, end: datetime) -> dict:
         "stale_cameras_on_tables": [
             e.table.table_id for e in board.tables if e.evidence and e.evidence.stale
         ],
+        # Plain-language labels: the raw "clear_and_set" reads like an instruction to a model.
         "gemini_table_checks": {
             e.table.table_id: {
-                "state": e.evidence.table_check.state,
-                "items": e.evidence.table_check.items,
+                "looks": CHECK_LABEL[e.evidence.table_check.state],
+                "items_seen": e.evidence.table_check.items,
+                "table_state": e.session.operational_state.value,
             }
             for e in board.tables
             if e.evidence and e.evidence.table_check
@@ -182,7 +195,7 @@ class BriefingService:
         try:
             briefing, model = gemini.generate([PROMPT, json.dumps(facts, default=str)], Briefing)
         except gemini.GeminiUnavailable as err:
-            raise AiUnavailable(f"Shift briefing unavailable: {err}") from err
+            raise AiUnavailable("The shift briefing") from err
         result = ShiftBriefing(
             outlet_id=self.ctx.repo.outlet_id,
             generated_at=self.ctx.clock.now(),
@@ -206,7 +219,7 @@ class BriefingService:
                 [ASK_PROMPT, f"QUESTION: {question}", json.dumps(facts, default=str)], Answer
             )
         except gemini.GeminiUnavailable as err:
-            raise AiUnavailable(f"Ask-the-shift unavailable: {err}") from err
+            raise AiUnavailable("Ask-the-shift") from err
         return ShiftAnswer(
             question=question,
             generated_at=self.ctx.clock.now(),
@@ -231,7 +244,7 @@ class BriefingService:
                 [INSIGHTS_PROMPT, json.dumps(facts, default=str)], Insights
             )
         except gemini.GeminiUnavailable as err:
-            raise AiUnavailable(f"Efficiency insights unavailable: {err}") from err
+            raise AiUnavailable("Efficiency insights") from err
         out = ShiftInsights(
             generated_at=self.ctx.clock.now(),
             model=model,

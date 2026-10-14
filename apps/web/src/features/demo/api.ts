@@ -11,8 +11,24 @@ import type {
 } from '@/lib/api/types'
 import { OUTLET_ID } from '@/config'
 
+export type DemoMode = 'guided' | 'autoplay'
+
+export interface Narration {
+  t: number
+  kind: 'autopilot' | 'camera' | 'gemini' | 'arrival' | 'rules'
+  text: string
+}
+
+export interface TickResult {
+  media_s: number
+  sim_now: string
+  mode: DemoMode
+  narration: Narration[]
+}
+
 export interface DemoSessionInfo {
   session_id: string
+  mode: DemoMode
   duration_s: number
   time_scale: number
   camera_id: string
@@ -56,13 +72,16 @@ async function raw<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const demoApi = {
-  start: () => raw<DemoSessionInfo>('/sessions', { method: 'POST' }),
+  start: (mode: DemoMode) =>
+    raw<DemoSessionInfo>('/sessions', { method: 'POST', body: JSON.stringify({ mode }) }),
   timeline: () => raw<DemoTimeline>('/timeline'),
   tick: (sessionId: string, mediaS: number) =>
-    raw<{ media_s: number; sim_now: string }>(`/sessions/${sessionId}/tick`, {
+    raw<TickResult>(`/sessions/${sessionId}/tick`, {
       method: 'POST',
       body: JSON.stringify({ media_s: mediaS }),
     }),
+  setMode: (sessionId: string, mode: DemoMode) =>
+    raw<TickResult>(`/sessions/${sessionId}/mode`, { method: 'POST', body: JSON.stringify({ mode }) }),
 }
 
 /** Calls below go through the scoped client, so they hit the viewer's demo session. */

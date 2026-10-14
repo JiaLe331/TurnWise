@@ -19,6 +19,7 @@ The API reads Firestore once at startup and then only writes; board polling cost
 ```sh
 git clone <repo> turnwise && cd turnwise
 cp .env.example .env    # set SITE_ADDRESS, GOOGLE_CLOUD_PROJECT, FIREBASE_SERVICE_ACCOUNT_JSON, TURNWISE_GATEWAY_TOKEN
+# the live demo video is not in git: create apps/web/public/demo-media/mixkit-720p.mp4 first (see README)
 docker compose -f deploy/docker-compose.yml up -d --build
 curl https://<SITE_ADDRESS>/api/healthz
 ```

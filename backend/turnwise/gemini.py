@@ -11,7 +11,8 @@ import time
 from pydantic import BaseModel
 
 log = logging.getLogger("turnwise.gemini")
-DEFAULT_MODELS = "gemini-2.5-flash,gemini-3.1-flash-lite"  # pinned after the crop benchmark
+# Pinned after the crop benchmark; later entries are fallbacks with separate free-tier quotas.
+DEFAULT_MODELS = "gemini-2.5-flash,gemini-3.1-flash-lite,gemini-2.5-flash-lite,gemini-flash-latest"
 TIMEOUT_S = 30
 ATTEMPTS_PER_MODEL = 2
 

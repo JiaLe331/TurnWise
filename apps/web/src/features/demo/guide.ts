@@ -17,7 +17,7 @@ export interface Hint {
  * The demo's "AI guide": deterministic next steps from the board, camera evidence and Gemini's
  * table checks, most urgent first. Suggestions only; the viewer performs every action.
  */
-export function hints(entries: TableBoardEntry[], rec: Recommendation | undefined, waiting = 0): Hint[] {
+export function hints(entries: TableBoardEntry[], rec: Recommendation | undefined): Hint[] {
   const out: Hint[] = []
   for (const e of entries) {
     const id = e.table.table_id
@@ -63,7 +63,8 @@ export function hints(entries: TableBoardEntry[], rec: Recommendation | undefine
         title: `Camera sees guests at ${id}, which is still marked ready`,
         detail: 'Seat the waiting party there to start their session, or walk over and verify.',
         source: 'camera',
-        pause: waiting > 0, // a waiter brushing past an empty table is not worth stopping for
+        // Shown, but never worth stopping the replay: staff passing a table look the same on camera.
+        pause: false,
       })
     } else if (check?.state === 'leftovers' && !check.people_present) {
       out.push({
