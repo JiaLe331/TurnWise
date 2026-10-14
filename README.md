@@ -13,9 +13,11 @@ The web app and API start without a Firebase project or cloud credentials. The F
 ## Start locally
 
 ```sh
-pnpm install
-pnpm dev
+npm exec --yes --package=pnpm@11.25.0 -- pnpm install --frozen-lockfile
+make dev
 ```
+
+`make dev` uses npm to run the project's pinned pnpm version, so a global pnpm installation is not required.
 
 `pnpm dev` starts the API on port 8000 and the web app on port 5173 together, with both logs in one terminal; Ctrl+C stops both. `uv run` installs the Python dependencies on first use. To run one side on its own, use `pnpm dev:api` or `pnpm dev:web`. Restarting the API resets the demo data.
 
