@@ -30,4 +30,5 @@ def evidence_for(state: CameraState | None, session: TableSession, now) -> Table
         vacant_since=state.vacant_since,
         stale=is_stale(state, now),
         review_source="observation" if review else None,
+        table_check=state.table_check,
     )

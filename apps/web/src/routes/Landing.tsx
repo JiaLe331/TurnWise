@@ -1,4 +1,4 @@
-import { ArrowDown, ChevronsDown, Info, ScanEye, UserCheck } from 'lucide-react'
+import { ArrowDown, ChevronsDown, Info, Play, ScanEye, UserCheck } from 'lucide-react'
 import { lazy, Suspense, useCallback, useMemo, useRef } from 'react'
 import { Link, useLocation } from 'wouter'
 import { Logo } from '@/components/brand/Logo'
@@ -98,11 +98,11 @@ export default function Landing() {
           For your team
         </a>
         <Link
-          href="/staff"
+          href="/demo"
           className="rounded-[10px] bg-ink px-4 py-2.5 text-[15px] font-bold whitespace-nowrap text-white no-underline hover:bg-[#2a3a49]"
         >
-          <span className="sm:hidden">Open demo</span>
-          <span className="hidden sm:inline">Open the demo floor</span>
+          <span className="sm:hidden">Live demo</span>
+          <span className="hidden sm:inline">Watch the live demo</span>
         </Link>
       </header>
 
@@ -239,9 +239,17 @@ function Hero({ visible, onStart }: { visible: boolean; onStart: () => void }) {
         </p>
         <div className="flex flex-wrap gap-3">
           <Link
+            href="/demo"
+            tabIndex={visible ? undefined : -1}
+            className="inline-flex h-12 items-center gap-2 rounded-[10px] bg-ink px-5 text-[16px] font-bold text-white no-underline hover:bg-[#2a3a49]"
+          >
+            <Play className="size-4" aria-hidden />
+            Watch the live demo
+          </Link>
+          <Link
             href="/staff"
             tabIndex={visible ? undefined : -1}
-            className="inline-flex h-12 items-center rounded-[10px] bg-ink px-5 text-[16px] font-bold text-white no-underline hover:bg-[#2a3a49]"
+            className="inline-flex h-12 items-center rounded-[10px] border border-[#c9d0ca] bg-white px-5 text-[16px] font-bold text-ink no-underline hover:bg-wash"
           >
             Open the demo floor
           </Link>
@@ -257,7 +265,7 @@ function Hero({ visible, onStart }: { visible: boolean; onStart: () => void }) {
         </div>
         <p className="mt-4 hidden items-start gap-2 text-[14px] leading-normal font-medium text-pewter sm:flex">
           <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
-          The demo runs on seeded tables. Camera detection is in development.
+          The live demo replays real dining-room footage with camera detection and Gemini; the demo floor runs on seeded tables.
         </p>
       </div>
       <p className="absolute bottom-6 left-1/2 m-0 flex -translate-x-1/2 items-center gap-2 text-[14px] font-semibold whitespace-nowrap text-pewter">

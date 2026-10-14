@@ -6,10 +6,10 @@ import { useIdentity } from '@/lib/identity/dev-identity'
 import type { StepInput } from '@/lib/domain/next-step'
 import { compareTableIds } from '@/lib/domain/status'
 import { serverOffsetMs, useNow } from '@/lib/domain/time'
-import { ApiError, NetworkError, request } from './client'
+import { ApiError, apiScopeKey, NetworkError, request } from './client'
 import type { Board, TableBoardEntry } from './types'
 
-const boardKey = ['board', OUTLET_ID] as const
+const boardKey = () => ['board', OUTLET_ID, apiScopeKey()] as const
 
 export type Freshness = 'loading' | 'live' | 'delayed' | 'offline'
 
@@ -29,11 +29,11 @@ interface BoardValue {
 
 const BoardContext = createContext<BoardValue | null>(null)
 
-export function BoardProvider({ children }: { children: ReactNode }) {
+export function BoardProvider({ children, pollMs = POLL_MS }: { children: ReactNode; pollMs?: number }) {
   const query = useQuery({
-    queryKey: boardKey,
+    queryKey: boardKey(),
     queryFn: ({ signal }) => request<Board>(`/outlets/${OUTLET_ID}/board`, { signal }),
-    refetchInterval: POLL_MS,
+    refetchInterval: pollMs,
     refetchIntervalInBackground: false,
     refetchOnWindowFocus: true,
     retry: false,
@@ -131,7 +131,7 @@ export function useActions() {
     // Retrying reuses the same variables, so the same idempotency key: the API applies it once.
     retry: (count, error) => error instanceof NetworkError && count < 1,
     onSuccess: (entry, { options }) => {
-      queryClient.setQueryData<Board>(boardKey, (board) =>
+      queryClient.setQueryData<Board>(boardKey(), (board) =>
         board
           ? {
               ...board,
@@ -141,11 +141,11 @@ export function useActions() {
             }
           : board,
       )
-      void queryClient.invalidateQueries({ queryKey: boardKey })
+      void queryClient.invalidateQueries({ queryKey: boardKey() })
       toast.success(options.success)
     },
     onError: (error, { input }) => {
-      void queryClient.invalidateQueries({ queryKey: boardKey })
+      void queryClient.invalidateQueries({ queryKey: boardKey() })
       toast.error(describeError(error, input.tableId))
     },
   })

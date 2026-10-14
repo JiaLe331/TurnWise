@@ -24,6 +24,7 @@ def main() -> None:
     )
     parser.add_argument("--no-publish", action="store_true", help="preview only, no API writes")
     parser.add_argument("--port", type=int, default=8001)
+    parser.add_argument("--no-gemini", action="store_true", help="skip Gemini table checks")
     parser.add_argument(
         "--loop",
         action="store_true",
@@ -50,13 +51,18 @@ def main() -> None:
 
     detector = RfDetrDetector(args.model, args.device)
     publisher = None if args.no_publish else ObservationPublisher(args.api, token)
+    from turnwise import gemini
+    from turnwise.worker.table_check import TableChecker
+
+    checker = TableChecker() if gemini.configured() and not args.no_gemini else None
+    logging.getLogger("turnwise.gateway").info("Gemini table checks %s", "on" if checker else "off")
     slot = PreviewSlot()
     stop = threading.Event()
     current: list[ReplayRunner] = []
 
     def replay() -> None:
         while not stop.is_set():
-            runner = ReplayRunner(args.source, manifest, detector, publisher, slot)
+            runner = ReplayRunner(args.source, manifest, detector, publisher, slot, checker=checker)
             current[:] = [runner]
             runner.run()
             if not args.loop or slot.status != "ended":

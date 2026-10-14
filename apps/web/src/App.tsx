@@ -5,6 +5,7 @@ import { FloorApp } from '@/routes/FloorApp'
 import { NotFound } from '@/routes/NotFound'
 
 const Landing = lazy(() => import('@/routes/Landing'))
+const LiveDemo = lazy(() => import('@/routes/LiveDemo'))
 
 export default function App() {
   return (
@@ -12,6 +13,11 @@ export default function App() {
       <Route path="/">
         <Suspense fallback={null}>
           <Landing />
+        </Suspense>
+      </Route>
+      <Route path="/demo">
+        <Suspense fallback={null}>
+          <LiveDemo />
         </Suspense>
       </Route>
       <Route path="/floor">

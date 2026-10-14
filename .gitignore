@@ -16,3 +16,7 @@ __pycache__/
 backend/recordings/
 *service-account*.json
 *firebase-adminsdk*.json
+apps/web/public/demo-media/
+.DS_Store
+.claude/*.local.md
+**/.claude/*.local.md

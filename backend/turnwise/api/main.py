@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 from turnwise.api.deps import get_services
 from turnwise.api.routers import (
+    demo,
     health,
     metrics,
     observations,
@@ -39,11 +40,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     sweeper.cancel()
 
 
-app = FastAPI(title="TurnWise API", version="0.1.0", lifespan=lifespan)
+def handle_domain_error(_: Request, exc: DomainError) -> JSONResponse:
+    body = ApiError(code=exc.code, message=exc.message)
+    return JSONResponse(status_code=exc.status_code, content=body.model_dump())
 
-for router in (
-    health.router,
-    observations.router,
+
+OUTLET_ROUTERS = (
     outlets.router,
     tables.router,
     tasks.router,
@@ -51,11 +53,18 @@ for router in (
     recommendations.router,
     seating.router,
     metrics.router,
-):
+)
+
+app = FastAPI(title="TurnWise API", version="0.1.0", lifespan=lifespan)
+for router in (health.router, observations.router, *OUTLET_ROUTERS):
     app.include_router(router)
+app.add_exception_handler(DomainError, handle_domain_error)
 
-
-@app.exception_handler(DomainError)
-def handle_domain_error(_: Request, exc: DomainError) -> JSONResponse:
-    body = ApiError(code=exc.code, message=exc.message)
-    return JSONResponse(status_code=exc.status_code, content=body.model_dump())
+# Live demo: the same outlet routes, scoped to a per-viewer session (X-Demo-Session) that replays
+# the precomputed time-lapse on its own clock. Isolated from the live outlet above.
+demo_app = FastAPI(title="TurnWise live demo", version="0.1.0")
+for router in (demo.router, *OUTLET_ROUTERS):
+    demo_app.include_router(router)
+demo_app.add_exception_handler(DomainError, handle_domain_error)
+demo_app.dependency_overrides[get_services] = demo.demo_services
+app.mount("/demo", demo_app)

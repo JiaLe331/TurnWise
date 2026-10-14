@@ -98,6 +98,15 @@ def availability(
         latest.occupied_seen or latest.visual_status is VisualStatus.OCCUPIED
     ):
         return Availability(None, "shows guests on camera", evidence)
+    check = state.table_check
+    if (
+        check is not None
+        and check.state == "leftovers"
+        and not check.people_present
+        and (session.ready_at is None or check.checked_at >= session.ready_at)
+    ):
+        items = ", ".join(check.items) or "items"
+        return Availability(None, f"has {items} seen by Gemini since it was marked ready", evidence)
     return Availability(None, None, evidence)
 
 

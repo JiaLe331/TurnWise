@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from turnwise.camera_manifest import CameraManifest
 from turnwise.contracts import Board
 from turnwise.domain.board import build_board
+from turnwise.domain.briefing import BriefingService
 from turnwise.domain.clock import Clock, SystemClock
 from turnwise.domain.context import Context
 from turnwise.domain.observations import ObservationOperations
@@ -24,6 +25,7 @@ class Services:
     observations: ObservationOperations
     seating: SeatingOperations
     waitlist: WaitlistOperations
+    briefing: BriefingService
 
     def board(self) -> Board:
         return build_board(self.ctx)
@@ -55,4 +57,5 @@ def build_services(
         observations=ObservationOperations(ctx),
         seating=seating,
         waitlist=WaitlistOperations(ctx, seating),
+        briefing=BriefingService(ctx),
     )

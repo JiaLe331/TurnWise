@@ -35,8 +35,22 @@ interface RequestOptions {
   signal?: AbortSignal
 }
 
+/**
+ * Where requests go. The live board uses `/api`; the live demo points every request (board,
+ * actions, seating, Gemini) at its isolated session under `/api/demo`.
+ */
+let scope: { base: string; headers: Record<string, string> } = { base: '/api', headers: {} }
+
+export function setApiScope(next: { base: string; headers?: Record<string, string> }): void {
+  scope = { base: next.base, headers: next.headers ?? {} }
+}
+
+export function apiScopeKey(): string {
+  return `${scope.base}|${scope.headers['X-Demo-Session'] ?? ''}`
+}
+
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const headers: Record<string, string> = { Accept: 'application/json' }
+  const headers: Record<string, string> = { Accept: 'application/json', ...scope.headers }
   if (options.body !== undefined) headers['Content-Type'] = 'application/json'
   if (options.idempotencyKey) headers['Idempotency-Key'] = options.idempotencyKey
 
@@ -48,7 +62,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 
   let response: Response
   try {
-    response = await fetch(`/api${path}`, {
+    response = await fetch(`${scope.base}${path}`, {
       method: options.method ?? 'GET',
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),

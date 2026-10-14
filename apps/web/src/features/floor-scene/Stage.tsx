@@ -1,5 +1,5 @@
 import { Box, LayoutGrid } from 'lucide-react'
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { inLens, useLensSets, type Lens } from '@/features/lenses/lens'
 import { TableTag } from '@/features/table/TableTag'
 import { TileGrid } from '@/features/table/TileGrid'
@@ -8,7 +8,7 @@ import type { TableBoardEntry } from '@/lib/api/types'
 import { cn } from '@/lib/cn'
 import { usePrefersReducedMotion } from '@/lib/use-media'
 import type { Insets } from './FloorScene'
-import { illustrativeLayout } from './layout'
+import { illustrativeLayout, type FloorLayout } from './layout'
 
 const FloorScene = lazy(() => import('./FloorScene'))
 
@@ -69,9 +69,23 @@ interface StageProps {
   /** Small embedded floor: tags only for the lens's tables, camera frames the selection. */
   compact?: boolean
   className?: string
+  /** Fixed floor plan (e.g. built from camera footage) instead of the illustrative grid. */
+  layoutOverride?: FloorLayout
+  room?: ReactNode
+  azimuth?: number
 }
 
-export function Stage({ lens, selectedId, onSelect, insets = {}, compact = false, className }: StageProps) {
+export function Stage({
+  lens,
+  selectedId,
+  onSelect,
+  insets = {},
+  compact = false,
+  className,
+  layoutOverride,
+  room,
+  azimuth,
+}: StageProps) {
   const { entries, serverNow, queuePosition, freshness } = useBoard()
   const { queued, flagged } = useLensSets()
   const [mode, setMode] = useFloorMode()
@@ -85,7 +99,8 @@ export function Stage({ lens, selectedId, onSelect, insets = {}, compact = false
 
   // Only the table set shapes the layout; state changes never move a table.
   const shapeKey = entries.map((e) => `${e.table.table_id}:${e.table.zone}:${e.table.capacity}:${e.table.attributes.join(',')}`).join('|')
-  const layout = useMemo(() => illustrativeLayout(entries), [shapeKey])
+  const illustrative = useMemo(() => illustrativeLayout(entries), [shapeKey])
+  const layout = layoutOverride ?? illustrative
 
   const tagged = compact ? entries.filter((e) => !isDimmed(e) || e.table.table_id === selectedId) : entries
   const tagKey = tagged.map((e) => e.table.table_id).join(',')
@@ -108,6 +123,8 @@ export function Stage({ lens, selectedId, onSelect, insets = {}, compact = false
               reducedMotion={reducedMotion}
               tagEls={tagEls}
               tagKey={tagKey}
+              room={room}
+              azimuth={azimuth}
             />
           </Suspense>
           {/* Pointer shortcut only: the ledger is the keyboard and screen-reader path to every table. */}

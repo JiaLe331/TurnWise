@@ -1,5 +1,5 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { useEffect, useMemo, useRef, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, type ReactNode, type RefObject } from 'react'
 import * as THREE from 'three'
 import type { TableBoardEntry } from '@/lib/api/types'
 import type { FloorLayout } from './layout'
@@ -108,12 +108,14 @@ function CameraRig({
   focusId,
   focusZoom,
   reducedMotion,
+  azimuth = DEFAULT_AZIMUTH,
 }: {
   layout: FloorLayout
   insets: Insets
   focusId: string | null
   focusZoom: number
   reducedMotion: boolean
+  azimuth?: number
 }) {
   const camera = useThree((s) => s.camera) as THREE.OrthographicCamera
   const size = useThree((s) => s.size)
@@ -129,12 +131,12 @@ function CameraRig({
         width: size.width,
         height: size.height,
         insets: { left, right, top, bottom },
-        azimuth: DEFAULT_AZIMUTH,
+        azimuth,
         elevation: DEFAULT_ELEVATION,
         focus: focus ? new THREE.Vector3(focus.x, 0.8, focus.z) : null,
         zoomK: focus ? focusZoom : 1,
       }),
-    [layout, size.width, size.height, left, right, top, bottom, focus, focusZoom],
+    [layout, size.width, size.height, left, right, top, bottom, focus, focusZoom, azimuth],
   )
 
   useEffect(() => {
@@ -216,6 +218,9 @@ export interface FloorSceneProps {
   reducedMotion: boolean
   tagEls: RefObject<Map<string, HTMLElement>>
   tagKey: string
+  /** Replaces the illustrative room, e.g. a room built to match a camera's footage. */
+  room?: ReactNode
+  azimuth?: number
 }
 
 export default function FloorScene({
@@ -230,6 +235,8 @@ export default function FloorScene({
   reducedMotion,
   tagEls,
   tagKey,
+  room,
+  azimuth,
 }: FloorSceneProps) {
   return (
     <Canvas
@@ -242,8 +249,8 @@ export default function FloorScene({
       style={{ position: 'absolute', inset: 0 }}
     >
       <SceneLights layout={layout} />
-      <CameraRig layout={layout} insets={insets} focusId={focusId} focusZoom={focusZoom} reducedMotion={reducedMotion} />
-      <Room layout={layout} />
+      <CameraRig layout={layout} insets={insets} focusId={focusId} focusZoom={focusZoom} reducedMotion={reducedMotion} azimuth={azimuth} />
+      {room ?? <Room layout={layout} />}
       {entries.map((entry) => {
         const placed = layout.tables.get(entry.table.table_id)
         if (!placed) return null

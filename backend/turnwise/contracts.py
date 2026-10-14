@@ -53,6 +53,35 @@ class Table(BaseModel):
     blocked: bool
 
 
+TableCheckState = Literal["clear_and_set", "leftovers", "unclear"]
+TableCheckItem = Literal[
+    "used plates",
+    "bowls",
+    "used glasses",
+    "cups",
+    "cutlery",
+    "food",
+    "napkins",
+    "bottles",
+    "belongings",
+]
+
+
+class TableCheckResult(BaseModel):
+    """Gemini's structured answer for one table crop. Advisory evidence only."""
+
+    people_present: bool
+    state: TableCheckState
+    items: list[TableCheckItem] = Field(default_factory=list, max_length=9)
+    reason: str = Field(max_length=200)
+
+
+class TableCheck(TableCheckResult):
+    checked_at: AwareDatetime
+    model: str
+    prompt_version: str
+
+
 class ObservationSubmission(BaseModel):
     """One interval summary for one table, sent by the authenticated local vision service."""
 
@@ -80,6 +109,7 @@ class ObservationSubmission(BaseModel):
     model_version: str
     policy_version: str
     prompt_version: str | None = None
+    table_check: TableCheck | None = None
 
 
 class Observation(ObservationSubmission):
@@ -99,6 +129,8 @@ class CameraState(BaseModel):
     last_observed_at: datetime | None = None
     vacant_since: datetime | None = None
     review_version: int | None = None  # session.state_version when vision requested review
+    table_check: TableCheck | None = None
+    alerted_check_at: datetime | None = None
     stale_recorded: bool = False
     latest: Observation | None = None
 
@@ -116,6 +148,7 @@ class TableEvidence(BaseModel):
     vacant_since: datetime | None
     stale: bool
     review_source: Literal["observation"] | None
+    table_check: TableCheck | None = None
 
 
 class TableSession(BaseModel):

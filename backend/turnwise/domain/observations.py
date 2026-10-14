@@ -36,6 +36,7 @@ def reset_vacancy(ctx: Context, table_id: str) -> None:
         return
     state.vacant_since = None
     state.review_version = None
+    state.table_check = None
     state.reset_at = ctx.clock.now()
     ctx.repo.put_camera_state(state)
 
@@ -123,6 +124,7 @@ class ObservationOperations:
             self.ctx.repo.put_session(session)
 
         self._apply_rules(state, session, observation, valid, previous)
+        self._apply_table_check(state, session, sub, now)
         self.ctx.repo.put_camera_state(state)
         return entry_for(self.ctx, sub.table_id)
 
@@ -171,6 +173,37 @@ class ObservationOperations:
         ):
             # Verification blocker for A's recommendation/hold logic; never changes state.
             self._event(session, "occupancy_on_ready_table", obs, "Guests seen at a ready table")
+
+    def _apply_table_check(
+        self, state: CameraState, session: TableSession, sub: ObservationSubmission, now
+    ) -> None:
+        """Gemini's table check is advisory: it is stored as evidence and may raise one
+        verification event for a ready table, but never changes operational state."""
+        check = sub.table_check
+        if check is None or check.checked_at > now + FUTURE_SKEW:
+            return
+        if state.reset_at is not None and check.checked_at < state.reset_at:
+            return  # predates a staff decision
+        if state.table_check is not None and check.checked_at <= state.table_check.checked_at:
+            return
+        state.table_check = check
+        if (
+            session.operational_state is OperationalState.READY
+            and check.state == "leftovers"
+            and not check.people_present
+            and (session.ready_at is None or check.checked_at >= session.ready_at)
+            and state.alerted_check_at != check.checked_at
+        ):
+            state.alerted_check_at = check.checked_at
+            items = ", ".join(check.items) or "items"
+            record_event(
+                self.ctx,
+                event_type="ready_table_leftovers_seen",
+                actor=OBSERVER,
+                table_id=session.table_id,
+                session_id=session.session_id,
+                reason=f"Gemini ({check.model}) sees {items}: {check.reason}"[:300],
+            )
 
     def _event(self, session: TableSession, kind: str, obs: Observation, why: str) -> None:
         record_event(

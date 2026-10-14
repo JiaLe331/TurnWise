@@ -108,6 +108,7 @@ class ReplayRunner:
         publisher: Publisher | None,
         slot: PreviewSlot,
         recording_id: str | None = None,
+        checker=None,
     ) -> None:
         self.source = source
         self.manifest = manifest
@@ -118,6 +119,8 @@ class ReplayRunner:
         self.run_id = f"replay-{uuid4().hex[:12]}"
         self._stop = threading.Event()
         self._seq = 0
+        self.checker = checker  # optional Gemini TableChecker, shared across loop passes
+        self._sent_checks: dict[str, datetime] = {}
 
     def stop(self) -> None:
         self._stop.set()
@@ -206,6 +209,13 @@ class ReplayRunner:
                     if summary is not None:
                         self._publish(summary)
                 shown = display.update(media, evidence)
+                checks = {}
+                if self.checker is not None:
+                    if ok:
+                        self.checker.consider(cv2, frame, self.manifest.tables, shown, media, at)
+                    checks = {
+                        t.table_id: self.checker.latest(t.table_id) for t in self.manifest.tables
+                    }
                 now = time.monotonic()
                 if last_done is not None:
                     inst = 1 / max(now - last_done, 1e-6)
@@ -214,7 +224,9 @@ class ReplayRunner:
                 processed += 1
                 jpeg = None
                 if ok:
-                    image = annotate(cv2, frame, self.manifest, shown, evidence, media, duration)
+                    image = annotate(
+                        cv2, frame, self.manifest, shown, evidence, media, duration, checks
+                    )
                     jpeg = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, 75])[1].tobytes()
                 self.slot.put(
                     jpeg,
@@ -246,6 +258,11 @@ class ReplayRunner:
         if self.publisher is None:
             return
         self._seq += 1
+        check = self.checker.latest(s.table_id) if self.checker else None
+        if check is not None and self._sent_checks.get(s.table_id) == check.checked_at:
+            check = None  # each Gemini answer is sent once
+        if check is not None:
+            self._sent_checks[s.table_id] = check.checked_at
         unclear = s.unclear_seen or s.visual_status is VisualStatus.UNCLEAR
         self.publisher.publish(
             ObservationSubmission(
@@ -272,6 +289,8 @@ class ReplayRunner:
                 media_offset_s=s.media_offset_s,
                 model_version=self.detector.model_version,
                 policy_version=POLICY_VERSION,
+                prompt_version=check.prompt_version if check else None,
+                table_check=check,
             )
         )
 
@@ -287,7 +306,7 @@ def _table_text(
     }
 
 
-def annotate(cv2, frame, manifest, shown, evidence, media: float, duration: float):
+def annotate(cv2, frame, manifest, shown, evidence, media: float, duration: float, checks=None):
     """Camera-wall preview: a translucent zone over each table and its seats, a status tag,
     the camera name and the replay clock. No person or object boxes."""
     import numpy as np
@@ -307,6 +326,11 @@ def annotate(cv2, frame, manifest, shown, evidence, media: float, duration: floa
             text += f" {ev.seated}"
         elif status is VisualStatus.VACANT and items:
             color, text = ITEMS_LEFT_COLOR, f"{table.table_id} vacant, items left"
+        check = (checks or {}).get(table.table_id)
+        if check is not None and status is not VisualStatus.OCCUPIED:
+            text += f" | Gemini: {check.state.replace('_', ' ')}"
+            if check.state == "leftovers":
+                color = ITEMS_LEFT_COLOR
         zones.append((hull, color, text))
 
     overlay = image.copy()
