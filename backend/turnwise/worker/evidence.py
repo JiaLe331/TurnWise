@@ -166,3 +166,28 @@ class TableSummarizer:
         self._last_status = ev.status
         self._interval = _Interval(started_at=at, last_frame_at=at)
         return summary
+
+
+DISPLAY_HOLD_S = 8.0  # longest detector gap seen on a seated guest in the sample: 6.25s
+
+
+class DisplaySmoother:
+    """Preview label only (evidence and the API are unaffected): a table shows occupied as soon
+    as a guest is seen, and leaves occupied only after DISPLAY_HOLD_S seconds without one, so a
+    single missed detection does not flicker the label."""
+
+    def __init__(self) -> None:
+        self._shown: dict[str, VisualStatus] = {}
+        self._away_since: dict[str, float] = {}
+
+    def update(self, media_s: float, evidence: dict[str, FrameEvidence]) -> dict[str, VisualStatus]:
+        for table_id, ev in evidence.items():
+            if ev.status is VisualStatus.OCCUPIED:
+                self._away_since.pop(table_id, None)
+                self._shown[table_id] = ev.status
+                continue
+            since = self._away_since.setdefault(table_id, media_s)
+            shown = self._shown.get(table_id)
+            if shown is not VisualStatus.OCCUPIED or media_s - since >= DISPLAY_HOLD_S:
+                self._shown[table_id] = ev.status
+        return dict(self._shown)

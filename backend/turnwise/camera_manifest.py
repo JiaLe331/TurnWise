@@ -23,6 +23,9 @@ class CameraManifest(BaseModel):
     width: int
     height: int
     tables: list[TableRegion]
+    # x1, y1, x2, y2 areas where people are small (far side of the room); the detector also runs
+    # on these crops upscaled 2x, which recovers distant seated guests.
+    detail_tiles: list[tuple[int, int, int, int]] = Field(default_factory=list)
 
 
 def load_manifests(directory: Path = DEFAULT_DIR) -> list[CameraManifest]:

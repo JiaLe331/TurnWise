@@ -21,9 +21,9 @@ def _post(client, path, body, key, headers=STAFF):
     return client.post(path, json=body, headers={**headers, "Idempotency-Key": key})
 
 
-def test_seeded_board_has_twelve_tables_and_a_clearing_queue(client):
+def test_seeded_board_has_fourteen_tables_and_a_clearing_queue(client):
     board = client.get("/outlets/demo-outlet/board").json()
-    assert len(board["tables"]) == 12
+    assert len(board["tables"]) == 14
     assert [e["table"]["table_id"] for e in board["clearing_queue"]] == ["T4", "T5", "T11"]
 
 

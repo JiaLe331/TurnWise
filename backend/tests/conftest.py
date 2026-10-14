@@ -1,3 +1,9 @@
+import os
+
+# Tests never touch real Firestore: these win over the repository .env (loaded with setdefault).
+os.environ["TURNWISE_STORAGE"] = "memory"
+os.environ["FIREBASE_SERVICE_ACCOUNT_JSON"] = ""
+
 from datetime import UTC, datetime
 
 import pytest

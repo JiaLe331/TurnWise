@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import { PERSONAS, type Persona } from './personas'
+import { DEMO_IDENTITY } from '@/config'
 
 const STORAGE_KEY = 'turnwise.dev-persona'
 
@@ -21,11 +22,11 @@ function readStored(): string | null {
 
 export function IdentityProvider({ children }: { children: ReactNode }) {
   const [actorId, setId] = useState<string | null>(() =>
-    import.meta.env.DEV ? (readStored() ?? 'staff-ana') : null,
+    DEMO_IDENTITY ? (readStored() ?? 'staff-ana') : null,
   )
 
   const setActorId = useCallback((id: string) => {
-    if (!import.meta.env.DEV) return
+    if (!DEMO_IDENTITY) return
     setId(id)
     try {
       localStorage.setItem(STORAGE_KEY, id)

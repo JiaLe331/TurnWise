@@ -12,6 +12,7 @@ import { cn } from '@/lib/cn'
 import { STATE } from '@/lib/domain/status'
 import { useIdentity } from '@/lib/identity/dev-identity'
 import { useMediaQuery, usePrefersReducedMotion } from '@/lib/use-media'
+import { DEMO_IDENTITY } from '@/config'
 
 const StoryScene = lazy(() => import('@/features/landing/StoryScene'))
 
@@ -451,7 +452,7 @@ function RoleEntry({ href, persona, title, body }: (typeof ROLES)[number]) {
       href={href}
       onClick={(e) => {
         e.preventDefault()
-        if (import.meta.env.DEV) setActorId(persona)
+        if (DEMO_IDENTITY) setActorId(persona)
         navigate(href)
       }}
       className="group flex flex-col rounded-[14px] border border-rule bg-white p-5 text-ink no-underline hover:border-ink"

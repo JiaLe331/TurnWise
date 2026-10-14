@@ -1,0 +1,13 @@
+# SITE_ADDRESS: a domain pointed at this server (automatic HTTPS), e.g. 13-250-1-2.sslip.io,
+# or ":80" for plain HTTP while testing.
+{$SITE_ADDRESS} {
+	encode zstd gzip
+	handle_path /api/* {
+		reverse_proxy api:8000
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

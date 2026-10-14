@@ -10,6 +10,7 @@ import {
 import { ROLE_LABEL } from '@/lib/domain/permissions'
 import { useIdentity } from '@/lib/identity/dev-identity'
 import { PERSONAS } from '@/lib/identity/personas'
+import { DEMO_IDENTITY } from '@/config'
 
 function Avatar({ initials }: { initials: string }) {
   return (
@@ -19,10 +20,10 @@ function Avatar({ initials }: { initials: string }) {
   )
 }
 
-/** Local-development identity picker. Not rendered in production builds. */
+/** Demo identity picker. Rendered in development and in demo-identity builds. */
 export function PersonaSwitcher({ compact = false }: { compact?: boolean }) {
   const { actor, setActorId } = useIdentity()
-  if (!import.meta.env.DEV || !actor) return null
+  if (!DEMO_IDENTITY || !actor) return null
 
   return (
     <Dropdown>

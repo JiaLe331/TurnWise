@@ -72,3 +72,14 @@ def test_repository_manifest_maps_known_tables():
     (manifest,) = load_manifests()
     assert manifest.camera_id == "cctv-01"
     assert (manifest.width, manifest.height) == (848, 480)
+
+
+def test_display_smoother_holds_occupied_through_brief_misses():
+    from turnwise.worker.evidence import DisplaySmoother
+
+    smoother = DisplaySmoother()
+    assert smoother.update(0.0, {"A": OCCUPIED})["A"] is VisualStatus.OCCUPIED
+    assert smoother.update(1.0, {"A": VACANT})["A"] is VisualStatus.OCCUPIED  # missed frame
+    assert smoother.update(8.9, {"A": VACANT})["A"] is VisualStatus.OCCUPIED  # 7.9s away
+    assert smoother.update(9.0, {"A": VACANT})["A"] is VisualStatus.VACANT  # 8.0s away
+    assert smoother.update(9.1, {"A": OCCUPIED})["A"] is VisualStatus.OCCUPIED  # back at once

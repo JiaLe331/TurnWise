@@ -1,0 +1,22 @@
+# Run from the repository root:  docker compose -f deploy/docker-compose.yml up -d --build
+services:
+  api:
+    build: ../backend
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      TURNWISE_STORAGE: firestore
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/web.Dockerfile
+    restart: unless-stopped
+    depends_on: [api]
+    env_file: ../.env
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_data:/data
+volumes:
+  caddy_data:

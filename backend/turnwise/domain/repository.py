@@ -58,6 +58,12 @@ class OutletRepository(Protocol):
     def list_active_holds(self) -> list[SeatingHold]: ...
 
 
+def _snapshot(data: dict[str, Any]) -> dict[str, Any]:
+    """Rollback copy. Shallow per collection is enough: stored models are never mutated in place
+    (every get/put copies), so only the containers change during a transaction."""
+    return {name: copy.copy(collection) for name, collection in data.items()}
+
+
 class InMemoryRepository:
     """Single-outlet store. Transactions are serialized and roll back on error."""
 
@@ -80,7 +86,7 @@ class InMemoryRepository:
     @contextmanager
     def transaction(self) -> Iterator[None]:
         with self._lock:
-            snapshot = copy.deepcopy(self._data) if self._depth == 0 else None
+            snapshot = _snapshot(self._data) if self._depth == 0 else None
             self._depth += 1
             try:
                 yield

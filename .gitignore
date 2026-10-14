@@ -14,3 +14,5 @@ __pycache__/
 *.pyc
 .playwright-mcp/
 backend/recordings/
+*service-account*.json
+*firebase-adminsdk*.json

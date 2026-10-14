@@ -19,6 +19,9 @@ from turnwise.api.routers import (
 )
 from turnwise.contracts import ApiError
 from turnwise.domain.errors import DomainError
+from turnwise.settings import load_env
+
+load_env()  # settings are read lazily per request, so loading here is early enough
 
 STALE_SWEEP_SECONDS = 5
 

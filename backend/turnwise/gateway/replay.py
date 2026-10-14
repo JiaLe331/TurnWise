@@ -18,6 +18,7 @@ from turnwise.contracts import ObservationSubmission, VisualStatus
 from turnwise.worker.evidence import (
     POLICY_VERSION,
     Detection,
+    DisplaySmoother,
     FrameEvidence,
     Summary,
     TableSummarizer,
@@ -29,17 +30,22 @@ log = logging.getLogger("turnwise.replay")
 # ponytail: frame-level usability gate, calibrated on the sample clip only (mean luma ~100,
 # Laplacian var >> 50). Re-tune on real outlet footage before trusting vacancy at night.
 MIN_BRIGHTNESS, MAX_BRIGHTNESS, MIN_SHARPNESS = 25.0, 235.0, 20.0
-STATUS_COLORS = {  # BGR
-    VisualStatus.OCCUPIED: (60, 160, 255),
-    VisualStatus.VACANT: (120, 200, 90),
-    VisualStatus.UNCLEAR: (180, 180, 180),
+# Zone colours (BGR), camera-wall style: amber occupied, green vacant, grey unclear,
+# red for a vacant table that still shows tabletop items.
+STATUS_COLORS = {
+    VisualStatus.OCCUPIED: (64, 178, 236),
+    VisualStatus.VACANT: (110, 205, 120),
+    VisualStatus.UNCLEAR: (170, 170, 170),
 }
+ITEMS_LEFT_COLOR = (80, 80, 225)
+PREVIEW_SCALE = 1.5  # draw on an upscaled frame so labels stay crisp
+ZONE_ALPHA = 0.4
 
 
 class Detector(Protocol):
     model_version: str
 
-    def detect(self, frame_bgr) -> list[Detection]: ...
+    def detect_with_tiles(self, frame_bgr, tiles) -> list[Detection]: ...
 
 
 class Publisher(Protocol):
@@ -150,6 +156,7 @@ class ReplayRunner:
             return
         duration = frames / fps
         summarizers = {t.table_id: TableSummarizer(t.table_id) for t in self.manifest.tables}
+        display = DisplaySmoother()
         started_at = datetime.now(UTC)
         wall0 = time.monotonic()
         first_ts: float | None = None
@@ -184,7 +191,9 @@ class ReplayRunner:
                 problem = None if ok else "decode failure"
                 if ok:
                     try:
-                        detections = self.detector.detect(frame)
+                        detections = self.detector.detect_with_tiles(
+                            frame, self.manifest.detail_tiles
+                        )
                         problem = frame_problem(frame, cv2)
                     except Exception:
                         log.exception("inference failed")
@@ -196,6 +205,7 @@ class ReplayRunner:
                     summary = summarizers[table_id].add(at, media, ev)
                     if summary is not None:
                         self._publish(summary)
+                shown = display.update(media, evidence)
                 now = time.monotonic()
                 if last_done is not None:
                     inst = 1 / max(now - last_done, 1e-6)
@@ -204,9 +214,7 @@ class ReplayRunner:
                 processed += 1
                 jpeg = None
                 if ok:
-                    image = annotate(
-                        cv2, frame, detections, self.manifest, evidence, media, duration
-                    )
+                    image = annotate(cv2, frame, self.manifest, shown, evidence, media, duration)
                     jpeg = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, 75])[1].tobytes()
                 self.slot.put(
                     jpeg,
@@ -219,7 +227,7 @@ class ReplayRunner:
                     processed_frames=processed,
                     dropped_frames=dropped,
                     failed_frames=failures,
-                    tables=_table_text(evidence),
+                    tables=_table_text(evidence, shown),
                 )
         finally:
             cap.release()
@@ -268,43 +276,80 @@ class ReplayRunner:
         )
 
 
-def _table_text(evidence: dict[str, FrameEvidence]) -> dict[str, str]:
+def _table_text(
+    evidence: dict[str, FrameEvidence], shown: dict[str, VisualStatus]
+) -> dict[str, str]:
     return {
-        tid: f"{ev.status.value}, {ev.seated} seated"
+        tid: f"{shown[tid].value}, {ev.seated} seated now"
         + (f", {', '.join(sorted(ev.object_flags))}" if ev.object_flags else "")
         + (f" ({'; '.join(ev.reasons)})" if ev.reasons else "")
         for tid, ev in evidence.items()
     }
 
 
-def annotate(cv2, frame, detections, manifest, evidence, media: float, duration: float):
+def annotate(cv2, frame, manifest, shown, evidence, media: float, duration: float):
+    """Camera-wall preview: a translucent zone over each table and its seats, a status tag,
+    the camera name and the replay clock. No person or object boxes."""
     import numpy as np
 
-    image = frame.copy()
+    k = PREVIEW_SCALE
+    image = cv2.resize(frame, None, fx=k, fy=k, interpolation=cv2.INTER_LINEAR)
+    zones = []
     for table in manifest.tables:
+        points = np.float32([*table.tabletop, *(p for seat in table.seats for p in seat)]) * k
+        hull = cv2.convexHull(points).astype(np.int32)
+        status = shown[table.table_id]
         ev = evidence[table.table_id]
-        color = STATUS_COLORS[ev.status]
-        cv2.polylines(image, [np.int32(table.tabletop)], True, color, 2)
-        for seat in table.seats:
-            cv2.polylines(image, [np.int32(seat)], True, color, 1)
-        x, y = (int(v) for v in table.tabletop[0])
-        _label(cv2, image, f"{table.table_id} {ev.status.value}", (x, y - 4), color)
-    for det in detections:
-        if det.class_name != "person" and det.class_name not in ("cup", "bowl", "bottle"):
-            continue
-        x1, y1, x2, y2 = (int(v) for v in det.xyxy)
-        cv2.rectangle(image, (x1, y1), (x2, y2), (255, 255, 255), 1)
-        _label(cv2, image, f"{det.class_name} {det.confidence:.2f}", (x1, y2 + 10), (40, 40, 40))
-    clock = f"{_mmss(media)} / {_mmss(duration)}  Recorded replay 1x"
-    _label(cv2, image, clock, (8, image.shape[0] - 8), (20, 20, 20), scale=0.5)
+        items = sorted(ev.object_flags - {"belongings"})
+        color = STATUS_COLORS[status]
+        text = f"{table.table_id} {status.value}"
+        if status is VisualStatus.OCCUPIED and ev.seated:
+            text += f" {ev.seated}"
+        elif status is VisualStatus.VACANT and items:
+            color, text = ITEMS_LEFT_COLOR, f"{table.table_id} vacant, items left"
+        zones.append((hull, color, text))
+
+    overlay = image.copy()
+    for hull, color, _ in zones:
+        cv2.fillPoly(overlay, [hull], color, lineType=cv2.LINE_AA)
+    image = cv2.addWeighted(overlay, ZONE_ALPHA, image, 1 - ZONE_ALPHA, 0)
+    placed: list[tuple[int, int, int, int]] = []
+    for hull, color, text in zones:
+        cv2.polylines(image, [hull], True, color, 2, lineType=cv2.LINE_AA)
+        x, y, _, _ = cv2.boundingRect(hull)
+        placed.append(_tag(cv2, image, text, (x + 4, y + 4), color, (25, 25, 25), placed))
+    _pill(cv2, image, manifest.name.upper(), (12, 12))
+    clock = f"{_mmss(media)} / {_mmss(duration)}  RECORDED REPLAY 1x"
+    h = image.shape[0]
+    _pill(cv2, image, clock, (12, h - 36))
     return image
 
 
-def _label(cv2, image, text, origin, bg, scale=0.4) -> None:
-    (w, h), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, 1)
+FONT = 0  # cv2.FONT_HERSHEY_SIMPLEX
+
+
+def _tag(cv2, image, text, origin, bg, fg, placed, scale=0.45):
+    """Small filled tag; moves down past tags it would overlap."""
+    (w, h), _ = cv2.getTextSize(text, FONT, scale, 1)
     x, y = origin
-    cv2.rectangle(image, (x - 2, y - h - 3), (x + w + 2, y + 3), bg, -1)
-    cv2.putText(image, text, (x, y), cv2.FONT_HERSHEY_SIMPLEX, scale, (255, 255, 255), 1)
+    box = (x, y, x + w + 10, y + h + 10)
+    while any(
+        not (box[2] < p[0] or box[0] > p[2] or box[3] < p[1] or box[1] > p[3]) for p in placed
+    ):
+        y = box[3] + 3
+        box = (x, y, x + w + 10, y + h + 10)
+    cv2.rectangle(image, box[:2], box[2:], bg, -1)
+    cv2.putText(image, text, (x + 5, y + h + 4), FONT, scale, fg, 1, cv2.LINE_AA)
+    return box
+
+
+def _pill(cv2, image, text, origin, scale=0.55) -> None:
+    (w, h), _ = cv2.getTextSize(text, FONT, scale, 1)
+    x, y = origin
+    overlay = image.copy()
+    cv2.rectangle(overlay, (x, y), (x + w + 20, y + h + 14), (30, 30, 30), -1)
+    cv2.addWeighted(overlay, 0.75, image, 0.25, 0, dst=image)
+    cv2.putText(image, text, (x + 10, y + h + 7), FONT, scale, (235, 235, 235), 1, cv2.LINE_AA)
 
 
 def _mmss(seconds: float) -> str:

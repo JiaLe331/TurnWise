@@ -1,3 +1,4 @@
+import json
 import os
 import secrets
 from dataclasses import dataclass
@@ -9,12 +10,34 @@ from fastapi import Depends, Header
 from turnwise.camera_manifest import load_manifests
 from turnwise.contracts import Actor, UserRole
 from turnwise.domain.errors import DomainError
-from turnwise.domain.services import Services, build_services
+from turnwise.domain.services import DEMO_OUTLET_ID, Services, build_services
 
 
 @lru_cache
 def get_services() -> Services:
-    return build_services(camera_manifests=load_manifests())
+    repo = None
+    if os.environ.get("TURNWISE_STORAGE", "memory") == "firestore":
+        from google.cloud import firestore
+
+        from turnwise.domain.firestore_repository import FirestoreRepository
+
+        repo = FirestoreRepository(DEMO_OUTLET_ID, _firestore_client(firestore))
+        repo.load()
+    return build_services(camera_manifests=load_manifests(), repo=repo)
+
+
+def _firestore_client(firestore):
+    """FIREBASE_SERVICE_ACCOUNT_JSON (the key file's JSON, one line) if set; otherwise the default
+    Google credentials, GOOGLE_APPLICATION_CREDENTIALS, or the emulator."""
+    raw = os.environ.get("FIREBASE_SERVICE_ACCOUNT_JSON")
+    if not raw:
+        return firestore.Client()
+    from google.oauth2 import service_account
+
+    info = json.loads(raw)
+    credentials = service_account.Credentials.from_service_account_info(info)
+    project = os.environ.get("GOOGLE_CLOUD_PROJECT") or info["project_id"]
+    return firestore.Client(project=project, credentials=credentials)
 
 
 class Unauthorized(DomainError):

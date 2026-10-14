@@ -1,4 +1,5 @@
 import type { UserRole } from './types'
+import { DEMO_IDENTITY } from '@/config'
 
 export interface Actor {
   id: string
@@ -39,8 +40,8 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   if (options.body !== undefined) headers['Content-Type'] = 'application/json'
   if (options.idempotencyKey) headers['Idempotency-Key'] = options.idempotencyKey
 
-  // Temporary header identity until Firebase Auth exists. Production builds drop this branch.
-  if (import.meta.env.DEV && options.actor) {
+  // Header identity for development and the no-sign-in demo build (DEMO_IDENTITY).
+  if (DEMO_IDENTITY && options.actor) {
     headers['X-Actor-Id'] = options.actor.id
     headers['X-Actor-Role'] = options.actor.role
   }

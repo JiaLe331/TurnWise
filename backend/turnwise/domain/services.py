@@ -6,9 +6,9 @@ from turnwise.domain.board import build_board
 from turnwise.domain.clock import Clock, SystemClock
 from turnwise.domain.context import Context
 from turnwise.domain.observations import ObservationOperations
-from turnwise.domain.repository import InMemoryRepository
+from turnwise.domain.repository import InMemoryRepository, OutletRepository
 from turnwise.domain.seating import SeatingOperations
-from turnwise.domain.seed import seed_demo_outlet
+from turnwise.domain.seed import seed_demo_outlet, sync_manifests
 from turnwise.domain.tables import TableOperations
 from turnwise.domain.tasks import TaskOperations
 from turnwise.domain.waitlist import WaitlistOperations
@@ -39,10 +39,13 @@ def build_services(
     *,
     seed: bool = True,
     camera_manifests: list[CameraManifest] | None = None,
+    repo: OutletRepository | None = None,
 ) -> Services:
-    ctx = Context(repo=InMemoryRepository(DEMO_OUTLET_ID), clock=clock or SystemClock())
-    if seed:
-        seed_demo_outlet(ctx, camera_manifests or [])
+    """`repo` defaults to a fresh in-memory outlet; a loaded persistent repo is not reseeded."""
+    ctx = Context(repo=repo or InMemoryRepository(DEMO_OUTLET_ID), clock=clock or SystemClock())
+    if seed and not ctx.repo.list_tables():
+        seed_demo_outlet(ctx)
+    sync_manifests(ctx, camera_manifests or [])
     tasks = TaskOperations(ctx)
     seating = SeatingOperations(ctx)
     return Services(

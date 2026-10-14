@@ -9,3 +9,8 @@ export const DELAYED_AFTER_MS = 15_000
 export const OFFLINE_AFTER_MS = 30_000
 /** Client-side threshold for the manager's "Unclaimed for 10+ min" exception. Not a server alert. */
 export const UNCLAIMED_ALERT_MIN = 10
+/**
+ * Persona switcher and X-Actor headers. On in development; a production build enables it with
+ * VITE_DEMO_IDENTITY=true for the no-sign-in demo deployment.
+ */
+export const DEMO_IDENTITY = import.meta.env.DEV || import.meta.env.VITE_DEMO_IDENTITY === 'true'

@@ -29,30 +29,43 @@ LAYOUT: list[tuple[str, int, str, list[str], OperationalState, int]] = [
     ("T10", 4, "Patio", ["outdoor"], OperationalState.OCCUPIED, 28),
     ("T11", 4, "Patio", ["outdoor"], OperationalState.NEEDS_CLEARING, 2),
     ("T12", 8, "Patio", ["outdoor"], OperationalState.OCCUPIED, 41),
+    # Visible on the replay camera with guests seated, so they start occupied.
+    ("T13", 4, "Main", [], OperationalState.OCCUPIED, 22),
+    ("T14", 2, "Main", [], OperationalState.OCCUPIED, 15),
 ]
 
 
-def seed_demo_outlet(ctx: Context, manifests: Sequence[CameraManifest] = ()) -> None:
-    now = ctx.clock.now()
+def seed_demo_outlet(ctx: Context) -> None:
     with ctx.repo.transaction():
-        _seed_layout(ctx, now)
-        for manifest in manifests:
-            apply_manifest(ctx, manifest)
+        _seed_layout(ctx, ctx.clock.now())
 
 
-def apply_manifest(ctx: Context, manifest: CameraManifest) -> None:
-    if manifest.outlet_id != ctx.repo.outlet_id:
-        return
-    for region in manifest.tables:
-        table = ctx.repo.get_table(region.table_id)
-        if table is None:
-            raise ValueError(f"{manifest.camera_id} maps unknown table {region.table_id}")
-        if table.camera_id not in (None, manifest.camera_id):
-            raise ValueError(f"{region.table_id} is already mapped to {table.camera_id}")
-        table.camera_id = manifest.camera_id
-        table.region = region.model_dump()
-        table.configuration_version = manifest.configuration_version
-        ctx.repo.put_table(table)
+def sync_manifests(ctx: Context, manifests: Sequence[CameraManifest]) -> None:
+    """Make table camera mappings match the manifests; tables absent from them stay manual."""
+    regions = {}
+    for manifest in manifests:
+        if manifest.outlet_id != ctx.repo.outlet_id:
+            continue
+        for region in manifest.tables:
+            if region.table_id in regions:
+                raise ValueError(f"{region.table_id} is mapped by more than one camera")
+            regions[region.table_id] = (manifest, region)
+    known = {t.table_id for t in ctx.repo.list_tables()}
+    if unknown := set(regions) - known:
+        raise ValueError(f"Camera manifests map unknown tables: {sorted(unknown)}")
+    with ctx.repo.transaction():
+        for table in ctx.repo.list_tables():
+            before = table.model_copy()
+            if table.table_id in regions:
+                manifest, region = regions[table.table_id]
+                table.camera_id = manifest.camera_id
+                table.region = region.model_dump()
+                table.configuration_version = manifest.configuration_version
+            else:
+                table.camera_id = None
+                table.region = None
+            if table != before:
+                ctx.repo.put_table(table)
 
 
 def _seed_layout(ctx: Context, now: datetime) -> None:
