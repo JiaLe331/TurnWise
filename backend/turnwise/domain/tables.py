@@ -1,6 +1,7 @@
 from turnwise.contracts import (
     Actor,
     OperationalState,
+    PartyStatus,
     TableAction,
     TableActionRequest,
     TableBoardEntry,
@@ -16,6 +17,7 @@ from turnwise.domain.context import (
     transition,
 )
 from turnwise.domain.errors import BadRequest, InvalidTransition, NotFound
+from turnwise.domain.observations import reset_vacancy
 from turnwise.domain.roles import require
 from turnwise.domain.tasks import TaskOperations
 
@@ -107,6 +109,7 @@ class TableOperations:
         self._expect(session, OperationalState.DEPARTURE_REVIEW)
         transition(session, OperationalState.OCCUPIED)
         self._save(session)
+        reset_vacancy(self.ctx, session.table_id)
         record_event(
             self.ctx,
             event_type="departure_review_dismissed",
@@ -124,6 +127,7 @@ class TableOperations:
         session.departed_at = self.ctx.clock.now()
         transition(session, OperationalState.NEEDS_CLEARING)
         self._save(session)
+        reset_vacancy(self.ctx, session.table_id)
         self.tasks.create_for_session(session)
         record_event(
             self.ctx,
@@ -134,6 +138,12 @@ class TableOperations:
             party_id=party_id,
         )
         if party_id is not None:
+            party = self.ctx.repo.get_party(party_id)
+            if party is not None and party.status is PartyStatus.SEATED:
+                party.status = PartyStatus.LEFT
+                party.ended_at = session.departed_at
+                party.version += 1
+                self.ctx.repo.put_party(party)
             record_event(
                 self.ctx,
                 event_type="party_left",
@@ -173,6 +183,7 @@ class TableOperations:
             session.ready_at = None
         transition(session, target)
         self._save(session)
+        reset_vacancy(self.ctx, session.table_id)
         if target is OperationalState.NEEDS_CLEARING:
             self.tasks.create_for_session(session)
         record_event(
@@ -191,6 +202,7 @@ class TableOperations:
         session.manual = False
         session.state_version += 1
         self._save(session)
+        reset_vacancy(self.ctx, session.table_id)
         record_event(
             self.ctx,
             event_type="override_released",

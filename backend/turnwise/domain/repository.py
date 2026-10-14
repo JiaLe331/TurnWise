@@ -4,8 +4,20 @@ from collections.abc import Iterator
 from contextlib import AbstractContextManager, contextmanager
 from typing import Any, Protocol
 
-from turnwise.contracts import AuditEvent, ClearingTask, Table, TableSession, TaskStatus
+from turnwise.contracts import (
+    AuditEvent,
+    CameraState,
+    ClearingTask,
+    HoldStatus,
+    Observation,
+    QueueParty,
+    SeatingHold,
+    Table,
+    TableSession,
+    TaskStatus,
+)
 
+MAX_OBSERVATIONS = 5_000
 OPEN_TASK_STATUSES = frozenset({TaskStatus.UNASSIGNED, TaskStatus.CLAIMED, TaskStatus.STARTED})
 
 
@@ -32,6 +44,19 @@ class OutletRepository(Protocol):
     def get_idempotent(self, key: str) -> tuple[str, Any] | None: ...
     def put_idempotent(self, key: str, fingerprint: str, result: Any) -> None: ...
 
+    def get_camera_state(self, table_id: str) -> CameraState | None: ...
+    def put_camera_state(self, state: CameraState) -> None: ...
+    def list_camera_states(self) -> list[CameraState]: ...
+    def append_observation(self, observation: Observation) -> None: ...
+    def list_observations(self, table_id: str | None = None) -> list[Observation]: ...
+
+    def get_party(self, party_id: str) -> QueueParty | None: ...
+    def put_party(self, party: QueueParty) -> None: ...
+    def list_parties(self) -> list[QueueParty]: ...
+    def get_hold(self, hold_id: str) -> SeatingHold | None: ...
+    def put_hold(self, hold: SeatingHold) -> None: ...
+    def list_active_holds(self) -> list[SeatingHold]: ...
+
 
 class InMemoryRepository:
     """Single-outlet store. Transactions are serialized and roll back on error."""
@@ -46,6 +71,10 @@ class InMemoryRepository:
             "tasks": {},
             "events": [],
             "idempotency": {},
+            "camera_states": {},
+            "observations": [],
+            "parties": {},
+            "holds": {},
         }
 
     @contextmanager
@@ -124,3 +153,61 @@ class InMemoryRepository:
     def put_idempotent(self, key: str, fingerprint: str, result: Any) -> None:
         with self._lock:
             self._data["idempotency"][key] = (fingerprint, copy.deepcopy(result))
+
+    def get_camera_state(self, table_id: str) -> CameraState | None:
+        with self._lock:
+            state = self._data["camera_states"].get(table_id)
+            return state.model_copy(deep=True) if state else None
+
+    def put_camera_state(self, state: CameraState) -> None:
+        with self._lock:
+            self._data["camera_states"][state.table_id] = state.model_copy(deep=True)
+
+    def list_camera_states(self) -> list[CameraState]:
+        with self._lock:
+            return [s.model_copy(deep=True) for s in self._data["camera_states"].values()]
+
+    def append_observation(self, observation: Observation) -> None:
+        with self._lock:
+            observations = self._data["observations"]
+            observations.append(observation.model_copy(deep=True))
+            # ponytail: keep newest N in memory; Firestore (A) owns the real retention policy.
+            del observations[:-MAX_OBSERVATIONS]
+
+    def list_observations(self, table_id: str | None = None) -> list[Observation]:
+        with self._lock:
+            return [
+                o.model_copy(deep=True)
+                for o in self._data["observations"]
+                if table_id is None or o.table_id == table_id
+            ]
+
+    def get_party(self, party_id: str) -> QueueParty | None:
+        with self._lock:
+            party = self._data["parties"].get(party_id)
+            return party.model_copy(deep=True) if party else None
+
+    def put_party(self, party: QueueParty) -> None:
+        with self._lock:
+            self._data["parties"][party.party_id] = party.model_copy(deep=True)
+
+    def list_parties(self) -> list[QueueParty]:
+        with self._lock:
+            return [p.model_copy(deep=True) for p in self._data["parties"].values()]
+
+    def get_hold(self, hold_id: str) -> SeatingHold | None:
+        with self._lock:
+            hold = self._data["holds"].get(hold_id)
+            return hold.model_copy(deep=True) if hold else None
+
+    def put_hold(self, hold: SeatingHold) -> None:
+        with self._lock:
+            self._data["holds"][hold.hold_id] = hold.model_copy(deep=True)
+
+    def list_active_holds(self) -> list[SeatingHold]:
+        with self._lock:
+            return [
+                h.model_copy(deep=True)
+                for h in self._data["holds"].values()
+                if h.status is HoldStatus.ACTIVE
+            ]

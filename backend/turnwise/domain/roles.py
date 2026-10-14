@@ -3,6 +3,7 @@ from turnwise.domain.errors import Forbidden
 
 STAFF = frozenset({UserRole.FLOOR_STAFF, UserRole.MANAGER})
 MANAGER = frozenset({UserRole.MANAGER})
+HOSTS = frozenset({UserRole.HOST, UserRole.MANAGER})
 
 PERMISSIONS: dict[str, frozenset[UserRole]] = {
     "request_departure_review": STAFF,
@@ -18,9 +19,17 @@ PERMISSIONS: dict[str, frozenset[UserRole]] = {
     "release_task": STAFF,
     "complete_task": STAFF,
     "cancel_task": MANAGER,
+    "withdraw_observation_review": frozenset(),
+    "create_party": HOSTS,
+    "update_party": HOSTS,
+    "cancel_party": HOSTS,
+    "left_party": HOSTS,
+    "create_hold": HOSTS,
+    "confirm_hold": HOSTS,
+    "cancel_hold": HOSTS,
 }
 
-SYSTEM_ACTIONS = frozenset({"request_departure_review"})
+SYSTEM_ACTIONS = frozenset({"request_departure_review", "withdraw_observation_review"})
 
 
 def require(actor: Actor, action: str) -> None:

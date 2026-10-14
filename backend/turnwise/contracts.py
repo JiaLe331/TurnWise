@@ -1,8 +1,8 @@
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel
+from pydantic import AwareDatetime, BaseModel, Field
 
 
 class UserRole(StrEnum):
@@ -53,17 +53,69 @@ class Table(BaseModel):
     blocked: bool
 
 
-class Observation(BaseModel):
-    observation_id: str
-    frame_id: str
+class ObservationSubmission(BaseModel):
+    """One interval summary for one table, sent by the authenticated local vision service."""
+
+    observation_id: str = Field(min_length=1, max_length=128)
+    frame_id: str = Field(min_length=1, max_length=128)
+    outlet_id: str
+    camera_id: str
     table_id: str
-    observed_at: datetime
-    received_at: datetime
+    configuration_version: int
+    stream_id: str = Field(min_length=1, max_length=128)
+    gateway_sequence: int = Field(ge=0)
+    interval_started_at: AwareDatetime
+    observed_at: AwareDatetime
+    continuous_valid_coverage: bool
+    occupied_seen: bool
+    unclear_seen: bool
     visual_status: VisualStatus
+    object_flags: list[str] = Field(default_factory=list, max_length=20)
+    occlusion: bool
+    reason: str = Field(default="", max_length=300)
+    uncertainty_reasons: list[str] = Field(default_factory=list, max_length=10)
+    source_mode: Literal["replay", "live"]
+    recording_id: str | None = None
+    media_offset_s: float | None = None
+    model_version: str
+    policy_version: str
+    prompt_version: str | None = None
+
+
+class Observation(ObservationSubmission):
+    received_at: datetime
+    session_id: str
+
+
+class CameraState(BaseModel):
+    """Server-owned per-table vision state: ordering checkpoint and vacancy continuity."""
+
+    table_id: str
+    camera_id: str
+    stream_id: str | None = None
+    retired_streams: list[str] = Field(default_factory=list)
+    last_sequence: int = -1
+    reset_at: datetime | None = None
+    last_observed_at: datetime | None = None
+    vacant_since: datetime | None = None
+    review_version: int | None = None  # session.state_version when vision requested review
+    stale_recorded: bool = False
+    latest: Observation | None = None
+
+
+class TableEvidence(BaseModel):
+    camera_id: str
+    source_mode: str | None
+    visual_status: VisualStatus | None
     object_flags: list[str]
     occlusion: bool
-    model_version: str
-    prompt_version: str
+    reason: str | None
+    uncertainty_reasons: list[str]
+    model_version: str | None
+    last_observed_at: datetime | None
+    vacant_since: datetime | None
+    stale: bool
+    review_source: Literal["observation"] | None
 
 
 class TableSession(BaseModel):
@@ -98,13 +150,38 @@ class QueueParty(BaseModel):
     arrival_at: datetime
     requirements: list[str]
     status: PartyStatus
+    version: int = 1
+    table_id: str | None = None
+    seated_at: datetime | None = None
+    ended_at: datetime | None = None
 
 
 class CreatePartyRequest(BaseModel):
-    queue_code: str
-    size: int
-    arrival_at: datetime
-    requirements: list[str]
+    queue_code: str = Field(min_length=1, max_length=16)
+    size: int = Field(ge=1, le=20)
+    arrival_at: AwareDatetime | None = None
+    requirements: list[str] = Field(default_factory=list, max_length=10)
+
+
+class PartyAction(StrEnum):
+    UPDATE = "update"
+    CANCEL = "cancel"
+    LEFT = "left"
+
+
+class PartyActionRequest(BaseModel):
+    action: PartyAction
+    expected_version: int
+    size: int | None = Field(default=None, ge=1, le=20)
+    requirements: list[str] | None = Field(default=None, max_length=10)
+    reason: str | None = None
+
+
+class HoldStatus(StrEnum):
+    ACTIVE = "active"
+    CONFIRMED = "confirmed"
+    CANCELLED = "cancelled"
+    EXPIRED = "expired"
 
 
 class SeatingHold(BaseModel):
@@ -113,6 +190,56 @@ class SeatingHold(BaseModel):
     table_id: str
     expires_at: datetime
     version: int
+    status: HoldStatus = HoldStatus.ACTIVE
+    created_at: datetime
+    created_by: str
+    table_state_version: int
+    manual: bool = False
+    override_reason: str | None = None
+
+
+class CreateHoldRequest(BaseModel):
+    party_id: str
+    table_id: str
+    party_version: int
+    table_version: int
+    override_reason: str | None = Field(default=None, max_length=300)
+
+
+class HoldAction(StrEnum):
+    CONFIRM = "confirm"
+    CANCEL = "cancel"
+
+
+class HoldActionRequest(BaseModel):
+    action: HoldAction
+    expected_version: int
+    reason: str | None = None
+
+
+class TableOption(BaseModel):
+    table_id: str
+    capacity: int
+    zone: str
+    attributes: list[str]
+    table_version: int
+    ready_at: datetime | None
+    evidence: Literal["camera", "manual"]
+    reason: str
+
+
+class QueueSkip(BaseModel):
+    party_id: str
+    queue_code: str
+    reason: str
+
+
+class Recommendation(BaseModel):
+    generated_at: datetime
+    party: QueueParty | None
+    tables: list[TableOption]
+    skipped: list[QueueSkip]
+    message: str
 
 
 class AuditEvent(BaseModel):
@@ -183,6 +310,7 @@ class TableBoardEntry(BaseModel):
     table: Table
     session: TableSession
     task: ClearingTask | None
+    evidence: TableEvidence | None = None
 
 
 class Board(BaseModel):
@@ -190,3 +318,11 @@ class Board(BaseModel):
     generated_at: datetime
     tables: list[TableBoardEntry]
     clearing_queue: list[TableBoardEntry]
+    waitlist: list[QueueParty] = Field(default_factory=list)
+    holds: list[SeatingHold] = Field(default_factory=list)
+
+
+class SeatingResult(BaseModel):
+    hold: SeatingHold
+    party: QueueParty
+    table: TableBoardEntry

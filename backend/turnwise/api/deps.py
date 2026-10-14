@@ -1,15 +1,41 @@
+import os
+import secrets
+from dataclasses import dataclass
 from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends, Header
 
+from turnwise.camera_manifest import load_manifests
 from turnwise.contracts import Actor, UserRole
+from turnwise.domain.errors import DomainError
 from turnwise.domain.services import Services, build_services
 
 
 @lru_cache
 def get_services() -> Services:
-    return build_services()
+    return build_services(camera_manifests=load_manifests())
+
+
+class Unauthorized(DomainError):
+    status_code = 401
+    code = "unauthorized"
+
+
+@dataclass(frozen=True)
+class GatewayCredential:
+    camera_scope: str | None
+
+
+def get_gateway(authorization: Annotated[str | None, Header()] = None) -> GatewayCredential:
+    # Local service token until A supplies service authentication. Never a human header identity.
+    expected = os.environ.get("TURNWISE_GATEWAY_TOKEN")
+    if not expected:
+        raise Unauthorized("Gateway token is not configured on this API.", code="gateway_disabled")
+    scheme, _, token = (authorization or "").partition(" ")
+    if scheme.lower() != "bearer" or not secrets.compare_digest(token, expected):
+        raise Unauthorized("Invalid gateway credential.")
+    return GatewayCredential(camera_scope=os.environ.get("TURNWISE_GATEWAY_CAMERA") or None)
 
 
 def get_actor(
@@ -27,3 +53,4 @@ def get_idempotency_key(idempotency_key: Annotated[str, Header(min_length=1)]) -
 ServicesDep = Annotated[Services, Depends(get_services)]
 ActorDep = Annotated[Actor, Depends(get_actor)]
 IdempotencyKeyDep = Annotated[str, Depends(get_idempotency_key)]
+GatewayDep = Annotated[GatewayCredential, Depends(get_gateway)]

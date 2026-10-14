@@ -1,5 +1,7 @@
-from datetime import timedelta
+from collections.abc import Sequence
+from datetime import datetime, timedelta
 
+from turnwise.camera_manifest import CameraManifest
 from turnwise.contracts import (
     Actor,
     ActorType,
@@ -30,45 +32,66 @@ LAYOUT: list[tuple[str, int, str, list[str], OperationalState, int]] = [
 ]
 
 
-def seed_demo_outlet(ctx: Context) -> None:
+def seed_demo_outlet(ctx: Context, manifests: Sequence[CameraManifest] = ()) -> None:
     now = ctx.clock.now()
     with ctx.repo.transaction():
-        for table_id, capacity, zone, attributes, state, minutes in LAYOUT:
-            began = now - timedelta(minutes=minutes)
-            ctx.repo.put_table(
-                Table(
-                    outlet_id=ctx.repo.outlet_id,
-                    table_id=table_id,
-                    capacity=capacity,
-                    zone=zone,
-                    attributes=attributes,
-                    camera_id=None,
-                    region=None,
-                    configuration_version=1,
-                    blocked=False,
-                ),
-            )
-            session = TableSession(
-                session_id=f"sess_{table_id}",
+        _seed_layout(ctx, now)
+        for manifest in manifests:
+            apply_manifest(ctx, manifest)
+
+
+def apply_manifest(ctx: Context, manifest: CameraManifest) -> None:
+    if manifest.outlet_id != ctx.repo.outlet_id:
+        return
+    for region in manifest.tables:
+        table = ctx.repo.get_table(region.table_id)
+        if table is None:
+            raise ValueError(f"{manifest.camera_id} maps unknown table {region.table_id}")
+        if table.camera_id not in (None, manifest.camera_id):
+            raise ValueError(f"{region.table_id} is already mapped to {table.camera_id}")
+        table.camera_id = manifest.camera_id
+        table.region = region.model_dump()
+        table.configuration_version = manifest.configuration_version
+        ctx.repo.put_table(table)
+
+
+def _seed_layout(ctx: Context, now: datetime) -> None:
+    for table_id, capacity, zone, attributes, state, minutes in LAYOUT:
+        began = now - timedelta(minutes=minutes)
+        ctx.repo.put_table(
+            Table(
+                outlet_id=ctx.repo.outlet_id,
                 table_id=table_id,
-                party_id=f"seed-party-{table_id}" if state is OperationalState.OCCUPIED else None,
-                operational_state=state,
-                state_version=1,
-                last_valid_observation_at=None,
-                seated_at=began if state is OperationalState.OCCUPIED else None,
-                departed_at=None if state is OperationalState.OCCUPIED else began,
-                ready_at=began if state is OperationalState.READY else None,
-            )
-            ctx.repo.put_session(session)
-            _seed_task(ctx, session)
-            record_event(
-                ctx,
-                event_type="state_initialized",
-                actor=SEED_ACTOR,
-                table_id=table_id,
-                session_id=session.session_id,
-                reason=f"Initial setup: {state.value}",
-            )
+                capacity=capacity,
+                zone=zone,
+                attributes=attributes,
+                camera_id=None,
+                region=None,
+                configuration_version=1,
+                blocked=False,
+            ),
+        )
+        session = TableSession(
+            session_id=f"sess_{table_id}",
+            table_id=table_id,
+            party_id=f"seed-party-{table_id}" if state is OperationalState.OCCUPIED else None,
+            operational_state=state,
+            state_version=1,
+            last_valid_observation_at=None,
+            seated_at=began if state is OperationalState.OCCUPIED else None,
+            departed_at=None if state is OperationalState.OCCUPIED else began,
+            ready_at=began if state is OperationalState.READY else None,
+        )
+        ctx.repo.put_session(session)
+        _seed_task(ctx, session)
+        record_event(
+            ctx,
+            event_type="state_initialized",
+            actor=SEED_ACTOR,
+            table_id=table_id,
+            session_id=session.session_id,
+            reason=f"Initial setup: {state.value}",
+        )
 
 
 def _seed_task(ctx: Context, session: TableSession) -> None:

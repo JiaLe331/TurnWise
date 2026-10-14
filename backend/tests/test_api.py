@@ -11,10 +11,10 @@ def test_health_endpoint() -> None:
     assert response.json() == {"status": "ok"}
 
 
-def test_operational_mutations_are_not_exposed() -> None:
+def test_waitlist_mutations_require_identity_headers() -> None:
     response = TestClient(app).post("/parties", json={"queue_code": "A1", "size": 2})
 
-    assert response.status_code == 404
+    assert response.status_code == 422
 
 
 def test_worker_health_endpoint() -> None:

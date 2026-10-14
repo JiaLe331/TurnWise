@@ -1,6 +1,11 @@
+import asyncio
+import contextlib
+from collections.abc import AsyncIterator
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from turnwise.api.deps import get_services
 from turnwise.api.routers import (
     health,
     metrics,
@@ -15,7 +20,23 @@ from turnwise.api.routers import (
 from turnwise.contracts import ApiError
 from turnwise.domain.errors import DomainError
 
-app = FastAPI(title="TurnWise API", version="0.1.0")
+STALE_SWEEP_SECONDS = 5
+
+
+async def _sweep_stale_cameras() -> None:
+    while True:
+        await asyncio.sleep(STALE_SWEEP_SECONDS)
+        app.dependency_overrides.get(get_services, get_services)().sweep()
+
+
+@contextlib.asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    sweeper = asyncio.create_task(_sweep_stale_cameras())
+    yield
+    sweeper.cancel()
+
+
+app = FastAPI(title="TurnWise API", version="0.1.0", lifespan=lifespan)
 
 for router in (
     health.router,

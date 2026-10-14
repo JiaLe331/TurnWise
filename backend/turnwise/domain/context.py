@@ -17,6 +17,7 @@ from turnwise.domain.errors import (
     NotFound,
     VersionConflict,
 )
+from turnwise.domain.evidence import evidence_for
 from turnwise.domain.repository import OutletRepository
 
 
@@ -55,7 +56,10 @@ def entry_for(ctx: Context, table_id: str) -> TableBoardEntry:
     if table is None or session is None:
         raise NotFound(f"Table {table_id} does not exist.")
     return TableBoardEntry(
-        table=table, session=session, task=ctx.repo.find_task(session.session_id)
+        table=table,
+        session=session,
+        task=ctx.repo.find_task(session.session_id),
+        evidence=evidence_for(ctx.repo.get_camera_state(table_id), session, ctx.clock.now()),
     )
 
 
@@ -68,6 +72,7 @@ def record_event(
     session_id: str | None = None,
     party_id: str | None = None,
     reason: str | None = None,
+    source: str | None = None,
 ) -> AuditEvent:
     now = ctx.clock.now()
     event = AuditEvent(
@@ -81,7 +86,7 @@ def record_event(
         received_at=now,
         actor_type=actor.actor_type.value,
         actor_id=actor.actor_id,
-        source="observation" if actor.actor_type is ActorType.SYSTEM else "manual",
+        source=source or ("observation" if actor.actor_type is ActorType.SYSTEM else "manual"),
         reason=reason,
     )
     ctx.repo.append_event(event)
