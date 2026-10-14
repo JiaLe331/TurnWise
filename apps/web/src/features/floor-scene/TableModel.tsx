@@ -130,6 +130,48 @@ function Appear({ children, reducedMotion }: { children: ReactNode; reducedMotio
   )
 }
 
+/** Faceless seated figures: enough to read "occupied" without depicting anyone. */
+function Guests({ shape }: { shape: TableShape }) {
+  const m = materials()
+  return (
+    <group>
+      {shape.seats.map((seat, i) => {
+        // Sit slightly toward the table from the chair centre.
+        const x = seat.x * 0.94
+        const z = seat.z * 0.94
+        return (
+          <group key={i} position={[x, 0, z]} rotation={[0, seat.rotation, 0]}>
+            <mesh position={[0, 0.78, -0.04]} material={m.guest} castShadow>
+              <capsuleGeometry args={[0.15, 0.3, 4, 12]} />
+            </mesh>
+            <mesh position={[0, 1.2, -0.02]} material={m.guest} castShadow>
+              <sphereGeometry args={[0.12, 16, 12]} />
+            </mesh>
+          </group>
+        )
+      })}
+    </group>
+  )
+}
+
+/** A bag beside the first chair and a phone on the table: signs a party is still here. */
+function Belongings({ shape }: { shape: TableShape }) {
+  const m = materials()
+  const seat = shape.seats[0]
+  const out = 1.45
+  return (
+    <group>
+      <group position={[seat.x * out + 0.28, 0, seat.z * out]} rotation={[0, 0.4, 0]}>
+        <RoundedBox args={[0.3, 0.24, 0.14]} radius={0.03} position={[0, 0.12, 0]} material={m.bag} castShadow />
+        <mesh position={[0, 0.28, 0]} rotation={[0, 0, Math.PI / 2]} material={m.bag}>
+          <torusGeometry args={[0.07, 0.012, 6, 16, Math.PI]} />
+        </mesh>
+      </group>
+      <RoundedBox args={[0.08, 0.012, 0.15]} radius={0.004} position={[0.18, TOP + 0.005, -0.12]} rotation={[0, 0.5, 0]} material={m.screen} />
+    </group>
+  )
+}
+
 /** A floor halo whose colour eases to the new state when the board changes. */
 function StatusHalo({ shape, color, selected, dimmed, reducedMotion }: { shape: TableShape; color: string; selected: boolean; dimmed: boolean; reducedMotion: boolean }) {
   const invalidate = useThree((s) => s.invalidate)
@@ -193,6 +235,10 @@ interface TableModelProps {
   dimmed: boolean
   reducedMotion: boolean
   onSelect: (id: string) => void
+  /** Seated figures, used by the landing walkthrough. */
+  guests?: boolean
+  /** A bag and phone, used by the landing walkthrough. */
+  belongings?: boolean
 }
 
 export const TableModel = memo(function TableModel({
@@ -203,6 +249,8 @@ export const TableModel = memo(function TableModel({
   dimmed,
   reducedMotion,
   onSelect,
+  guests = false,
+  belongings = false,
 }: TableModelProps) {
   const m = materials()
   const { shape } = placed
@@ -275,6 +323,8 @@ export const TableModel = memo(function TableModel({
           <Tabletop state={state} shape={shape} />
         </Appear>
       )}
+      {guests && !blocked ? <Guests shape={shape} /> : null}
+      {belongings && !blocked ? <Belongings shape={shape} /> : null}
     </group>
   )
 })

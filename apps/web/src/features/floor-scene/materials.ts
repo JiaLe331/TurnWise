@@ -76,6 +76,11 @@ function build() {
     candle: matte('#e9c46a', 0.4, { emissive: '#e9a23b', emissiveIntensity: 0.35 }),
     cloth: matte('#7a4db3', 0.8),
     screen: matte('#1b2733', 0.3),
+    guest: matte('#8d99a4', 0.75),
+    bag: matte('#7a5640', 0.6),
+    dome: matte('#f4f5f2', 0.35),
+    domeLens: matte('#1b2733', 0.2),
+    viewCone: new THREE.MeshBasicMaterial({ color: '#b7791f', transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide }),
   }
 }
 

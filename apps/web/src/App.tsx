@@ -1,13 +1,18 @@
+import { lazy, Suspense } from 'react'
 import { Redirect, Route, Switch } from 'wouter'
 import { BoardProvider } from '@/lib/api/board'
 import { FloorApp } from '@/routes/FloorApp'
 import { NotFound } from '@/routes/NotFound'
 
+const Landing = lazy(() => import('@/routes/Landing'))
+
 export default function App() {
   return (
     <Switch>
       <Route path="/">
-        <Redirect to="/staff" />
+        <Suspense fallback={null}>
+          <Landing />
+        </Suspense>
       </Route>
       <Route path="/floor">
         <Redirect to="/staff" />
