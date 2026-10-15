@@ -1,4 +1,4 @@
-import { Info, List, ListChecks, Map as MapIcon } from 'lucide-react'
+import { Info, List, ListChecks, Map as MapIcon, Users } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'wouter'
 import { Logo, LogoMark } from '@/components/brand/Logo'
@@ -9,6 +9,9 @@ import { Stage } from '@/features/floor-scene/Stage'
 import { Inspector } from '@/features/inspector/Inspector'
 import { Ledger } from '@/features/ledger/Ledger'
 import { QueueCards } from '@/features/ledger/QueueCards'
+import { WaitlistPanel } from '@/features/waitlist/WaitlistPanel'
+import { useRecommendation, waitlistOf } from '@/lib/api/seating'
+import type { Recommendation } from '@/lib/api/types'
 import { DEFAULT_LENS, LensSwitch, type Lens } from '@/features/lenses/lens'
 import { useBoard } from '@/lib/api/board'
 import type { UserRole } from '@/lib/api/types'
@@ -61,6 +64,7 @@ export function FloorApp({ role }: { role: RouteRole }) {
   const { byId } = useBoard()
   const selected = selectedId ? (byId.get(selectedId) ?? null) : null
   const announcement = useSelectedAnnouncement(selectedId)
+  const seating = useSeatingView(role)
 
   useEffect(() => setLens(DEFAULT_LENS[ROUTE_ROLE[role]]), [role])
 
@@ -72,11 +76,11 @@ export function FloorApp({ role }: { role: RouteRole }) {
         {announcement}
       </p>
       {layout === 'desktop' ? (
-        <DesktopFloor lens={lens} setLens={setLens} selected={selected} select={select} />
+        <DesktopFloor lens={lens} setLens={setLens} selected={selected} select={select} seating={seating} />
       ) : layout === 'tablet' ? (
-        <TabletFloor lens={lens} setLens={setLens} selected={selected} select={select} />
+        <TabletFloor lens={lens} setLens={setLens} selected={selected} select={select} seating={seating} />
       ) : (
-        <PhoneFloor role={role} lens={lens} setLens={setLens} selected={selected} select={select} />
+        <PhoneFloor role={role} lens={lens} setLens={setLens} selected={selected} select={select} seating={seating} />
       )}
     </div>
   )
@@ -87,6 +91,105 @@ interface FloorProps {
   setLens: (lens: Lens) => void
   selected: ReturnType<typeof useBoard>['entries'][number] | null
   select: (id: string | null) => void
+  /** Waitlist and seating state; null on views that don't seat parties. */
+  seating: SeatingView | null
+}
+
+interface SeatingView {
+  tab: 'waitlist' | 'tables'
+  setTab: (tab: 'waitlist' | 'tables') => void
+  rec: Recommendation | undefined
+  recLoading: boolean
+  partyId: string | null
+  setPartyId: (id: string | null) => void
+  waiting: number
+  /** Suggested tables to highlight on the floor, best first. */
+  spotlight: string[] | undefined
+}
+
+/** Hosts and managers seat parties, so their views get the waitlist and seating suggestions. */
+function useSeatingView(role: RouteRole): SeatingView | null {
+  const seats = role === 'host' || role === 'manager'
+  const { board } = useBoard()
+  const [tab, setTab] = useState<'waitlist' | 'tables'>(role === 'host' ? 'waitlist' : 'tables')
+  const [partyId, setPartyId] = useState<string | null>(null)
+  const waitlist = waitlistOf(board)
+  // A seated or removed party can't stay selected.
+  const activeParty = partyId && waitlist.some((p) => p.party_id === partyId && p.status === 'waiting') ? partyId : null
+  const query = useRecommendation(activeParty, seats && waitlist.length > 0)
+
+  useEffect(() => setTab(role === 'host' ? 'waitlist' : 'tables'), [role])
+
+  if (!seats) return null
+  const rec = waitlist.length > 0 ? query.data : undefined
+  return {
+    tab,
+    setTab,
+    rec,
+    recLoading: query.isLoading,
+    partyId: activeParty,
+    setPartyId,
+    waiting: waitlist.length,
+    spotlight: tab === 'waitlist' && rec?.party && rec.tables.length ? rec.tables.map((t) => t.table_id) : undefined,
+  }
+}
+
+/** The left panel: the plain table list, or Waitlist and Tables tabs for views that seat parties. */
+function SideList({
+  lens,
+  seating,
+  selectedId,
+  onSelect,
+  className,
+}: {
+  lens: Lens
+  seating: SeatingView | null
+  selectedId: string | null
+  onSelect: (id: string) => void
+  className?: string
+}) {
+  if (!seating) return <Ledger lens={lens} selectedId={selectedId} onSelect={onSelect} className={className} />
+  return (
+    <div className={cn('flex min-h-0 flex-col', className)}>
+      <div role="tablist" aria-label="List" className="flex shrink-0 gap-1 border-b border-rule px-3 pt-3">
+        {(
+          [
+            ['waitlist', `Waitlist`],
+            ['tables', 'Tables'],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={seating.tab === id}
+            onClick={() => seating.setTab(id)}
+            className={cn(
+              '-mb-px flex items-center gap-1.5 border-b-2 px-3 pb-2.5 text-[15px] font-semibold',
+              seating.tab === id ? 'border-ink text-ink' : 'border-transparent text-pewter hover:text-ink',
+            )}
+          >
+            {label}
+            {id === 'waitlist' && seating.waiting > 0 ? (
+              <span className="tabular rounded-full bg-ink px-1.5 text-[11.5px] font-bold text-white">{seating.waiting}</span>
+            ) : null}
+          </button>
+        ))}
+      </div>
+      {seating.tab === 'waitlist' ? (
+        <WaitlistPanel
+          rec={seating.rec}
+          recLoading={seating.recLoading}
+          selectedPartyId={seating.partyId}
+          onSelectParty={seating.setPartyId}
+          onSelectTable={onSelect}
+          className="min-h-0 flex-1"
+        />
+      ) : (
+        <Ledger lens={lens} selectedId={selectedId} onSelect={onSelect} className="min-h-0 flex-1" />
+      )}
+    </div>
+  )
 }
 
 const PHONE_LABEL: Record<RouteRole, string> = { host: 'Host', staff: 'Staff', manager: 'Manager' }
@@ -143,7 +246,7 @@ function IllustrativeNote({ className }: { className?: string }) {
 
 const PANEL = 'rounded-[var(--radius-panel)] border border-rule bg-white shadow-[var(--shadow-float)]'
 
-function DesktopFloor({ lens, setLens, selected, select }: FloorProps) {
+function DesktopFloor({ lens, setLens, selected, select, seating }: FloorProps) {
   const left = 16 + 296
   const right = selected ? 16 + 372 : 0
   return (
@@ -154,9 +257,10 @@ function DesktopFloor({ lens, setLens, selected, select }: FloorProps) {
         selectedId={selected?.table.table_id ?? null}
         onSelect={select}
         insets={{ left, right, top: 64, bottom: 56 }}
+        spotlight={seating?.spotlight}
       />
       <aside className={cn(PANEL, 'absolute top-4 bottom-4 left-4 z-10 flex w-[296px] flex-col overflow-hidden')}>
-        <Ledger lens={lens} selectedId={selected?.table.table_id ?? null} onSelect={select} className="min-h-0 flex-1" />
+        <SideList lens={lens} seating={seating} selectedId={selected?.table.table_id ?? null} onSelect={select} className="min-h-0 flex-1" />
       </aside>
       <div
         className="absolute top-4 z-10 -translate-x-1/2"
@@ -178,19 +282,19 @@ function DesktopFloor({ lens, setLens, selected, select }: FloorProps) {
   )
 }
 
-function TabletFloor({ lens, setLens, selected, select }: FloorProps) {
+function TabletFloor({ lens, setLens, selected, select, seating }: FloorProps) {
   const landscape = useMediaQuery('(orientation: landscape)')
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="relative h-[55%] shrink-0 border-b border-rule">
-        <Stage className="absolute inset-0" lens={lens} selectedId={selected?.table.table_id ?? null} onSelect={select} insets={{ top: 60, bottom: 40 }} />
+        <Stage className="absolute inset-0" lens={lens} selectedId={selected?.table.table_id ?? null} onSelect={select} insets={{ top: 60, bottom: 40 }} spotlight={seating?.spotlight} />
         <div className="absolute top-3 left-1/2 z-10 max-w-[calc(100%-24px)] -translate-x-1/2">
           <LensSwitch lens={lens} onChange={setLens} />
         </div>
         <IllustrativeNote className="absolute bottom-3 left-3 z-10 text-[12px]" />
       </div>
       <div className="min-h-0 flex-1 bg-white">
-        <Ledger lens={lens} selectedId={selected?.table.table_id ?? null} onSelect={select} className="h-full" />
+        <SideList lens={lens} seating={seating} selectedId={selected?.table.table_id ?? null} onSelect={select} className="h-full" />
       </div>
       <InspectorSheet selected={selected} select={select} side={landscape ? 'right' : 'bottom'} />
     </div>
@@ -209,7 +313,7 @@ function InspectorSheet({ selected, select, side }: Pick<FloorProps, 'selected' 
   )
 }
 
-function PhoneFloor({ role, lens, setLens, selected, select }: FloorProps & { role: RouteRole }) {
+function PhoneFloor({ role, lens, setLens, selected, select, seating }: FloorProps & { role: RouteRole }) {
   const [tab, setTab] = useState<'list' | 'floor'>('list')
   const [sheetFor, setSheetFor] = useState<string | null>(null)
   const staff = role === 'staff'
@@ -241,12 +345,12 @@ function PhoneFloor({ role, lens, setLens, selected, select }: FloorProps & { ro
               </div>
             </>
           ) : (
-            <Ledger lens={lens} selectedId={selected?.table.table_id ?? null} onSelect={openSheet} className="bg-white" />
+            <SideList lens={lens} seating={seating} selectedId={selected?.table.table_id ?? null} onSelect={openSheet} className="min-h-full bg-white" />
           )}
         </div>
       ) : (
         <div className="relative min-h-0 flex-1">
-          <Stage className="absolute inset-0" lens={lens} selectedId={selected?.table.table_id ?? null} onSelect={openSheet} insets={{ top: 56, bottom: 40 }} />
+          <Stage className="absolute inset-0" lens={lens} selectedId={selected?.table.table_id ?? null} onSelect={openSheet} insets={{ top: 56, bottom: 40 }} spotlight={seating?.spotlight} />
           <div className="absolute top-2.5 right-2.5 left-2.5 z-10">
             <LensSwitch lens={lens} onChange={setLens} />
           </div>
@@ -257,7 +361,7 @@ function PhoneFloor({ role, lens, setLens, selected, select }: FloorProps & { ro
       )}
       <nav aria-label="Phone views" className="flex h-16 shrink-0 border-t border-rule bg-white pb-[env(safe-area-inset-bottom)]">
         {[
-          { id: 'list' as const, label: staff ? 'Queue' : 'Tables', icon: staff ? ListChecks : List },
+          { id: 'list' as const, label: staff ? 'Queue' : role === 'host' ? 'Waitlist' : 'Tables', icon: staff ? ListChecks : role === 'host' ? Users : List },
           { id: 'floor' as const, label: 'Floor', icon: MapIcon },
         ].map(({ id, label, icon: Icon }) => (
           <button
