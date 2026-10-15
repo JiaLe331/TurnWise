@@ -9,6 +9,7 @@ import { Stage } from '@/features/floor-scene/Stage'
 import { Inspector } from '@/features/inspector/Inspector'
 import { Ledger } from '@/features/ledger/Ledger'
 import { QueueCards } from '@/features/ledger/QueueCards'
+import { ShiftOverview } from '@/features/manager/ShiftOverview'
 import { WaitlistPanel } from '@/features/waitlist/WaitlistPanel'
 import { useRecommendation, waitlistOf } from '@/lib/api/seating'
 import type { Recommendation } from '@/lib/api/types'
@@ -76,11 +77,11 @@ export function FloorApp({ role }: { role: RouteRole }) {
         {announcement}
       </p>
       {layout === 'desktop' ? (
-        <DesktopFloor lens={lens} setLens={setLens} selected={selected} select={select} seating={seating} />
+        <DesktopFloor lens={lens} setLens={setLens} selected={selected} select={select} seating={seating} shift={role === 'manager'} />
       ) : layout === 'tablet' ? (
-        <TabletFloor lens={lens} setLens={setLens} selected={selected} select={select} seating={seating} />
+        <TabletFloor lens={lens} setLens={setLens} selected={selected} select={select} seating={seating} shift={role === 'manager'} />
       ) : (
-        <PhoneFloor role={role} lens={lens} setLens={setLens} selected={selected} select={select} seating={seating} />
+        <PhoneFloor role={role} lens={lens} setLens={setLens} selected={selected} select={select} seating={seating} shift={role === 'manager'} />
       )}
     </div>
   )
@@ -93,11 +94,15 @@ interface FloorProps {
   select: (id: string | null) => void
   /** Waitlist and seating state; null on views that don't seat parties. */
   seating: SeatingView | null
+  /** The manager view shows the shift overview. */
+  shift: boolean
 }
 
+type ListTab = 'waitlist' | 'tables' | 'shift'
+
 interface SeatingView {
-  tab: 'waitlist' | 'tables'
-  setTab: (tab: 'waitlist' | 'tables') => void
+  tab: ListTab
+  setTab: (tab: ListTab) => void
   rec: Recommendation | undefined
   recLoading: boolean
   partyId: string | null
@@ -111,7 +116,7 @@ interface SeatingView {
 function useSeatingView(role: RouteRole): SeatingView | null {
   const seats = role === 'host' || role === 'manager'
   const { board } = useBoard()
-  const [tab, setTab] = useState<'waitlist' | 'tables'>(role === 'host' ? 'waitlist' : 'tables')
+  const [tab, setTab] = useState<ListTab>(role === 'host' ? 'waitlist' : 'tables')
   const [partyId, setPartyId] = useState<string | null>(null)
   const waitlist = waitlistOf(board)
   // A seated or removed party can't stay selected.
@@ -140,12 +145,15 @@ function SideList({
   seating,
   selectedId,
   onSelect,
+  shiftTab = false,
   className,
 }: {
   lens: Lens
   seating: SeatingView | null
   selectedId: string | null
   onSelect: (id: string) => void
+  /** Adds a Shift tab (manager on tablet and phone, where there's no right column). */
+  shiftTab?: boolean
   className?: string
 }) {
   if (!seating) return <Ledger lens={lens} selectedId={selectedId} onSelect={onSelect} className={className} />
@@ -154,8 +162,9 @@ function SideList({
       <div role="tablist" aria-label="List" className="flex shrink-0 gap-1 border-b border-rule px-3 pt-3">
         {(
           [
-            ['waitlist', `Waitlist`],
+            ['waitlist', 'Waitlist'],
             ['tables', 'Tables'],
+            ...(shiftTab ? ([['shift', 'Shift']] as const) : []),
           ] as const
         ).map(([id, label]) => (
           <button
@@ -185,6 +194,8 @@ function SideList({
           onSelectTable={onSelect}
           className="min-h-0 flex-1"
         />
+      ) : seating.tab === 'shift' && shiftTab ? (
+        <ShiftOverview className="min-h-0 flex-1" />
       ) : (
         <Ledger lens={lens} selectedId={selectedId} onSelect={onSelect} className="min-h-0 flex-1" />
       )}
@@ -246,9 +257,10 @@ function IllustrativeNote({ className }: { className?: string }) {
 
 const PANEL = 'rounded-[var(--radius-panel)] border border-rule bg-white shadow-[var(--shadow-float)]'
 
-function DesktopFloor({ lens, setLens, selected, select, seating }: FloorProps) {
+function DesktopFloor({ lens, setLens, selected, select, seating, shift }: FloorProps) {
   const left = 16 + 296
-  const right = selected ? 16 + 372 : 0
+  // The manager's right column always holds something: the inspector, or the shift overview.
+  const right = selected || shift ? 16 + 372 : 0
   return (
     <div className="relative min-h-0 flex-1">
       <Stage
@@ -277,12 +289,16 @@ function DesktopFloor({ lens, setLens, selected, select, seating }: FloorProps) 
         >
           <Inspector entry={selected} onClose={() => select(null)} />
         </aside>
+      ) : shift ? (
+        <aside className={cn(PANEL, 'absolute top-4 right-4 bottom-4 z-10 flex w-[372px] flex-col overflow-hidden')}>
+          <ShiftOverview className="min-h-0 flex-1" />
+        </aside>
       ) : null}
     </div>
   )
 }
 
-function TabletFloor({ lens, setLens, selected, select, seating }: FloorProps) {
+function TabletFloor({ lens, setLens, selected, select, seating, shift }: FloorProps) {
   const landscape = useMediaQuery('(orientation: landscape)')
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -294,7 +310,7 @@ function TabletFloor({ lens, setLens, selected, select, seating }: FloorProps) {
         <IllustrativeNote className="absolute bottom-3 left-3 z-10 text-[12px]" />
       </div>
       <div className="min-h-0 flex-1 bg-white">
-        <SideList lens={lens} seating={seating} selectedId={selected?.table.table_id ?? null} onSelect={select} className="h-full" />
+        <SideList lens={lens} seating={seating} selectedId={selected?.table.table_id ?? null} onSelect={select} shiftTab={shift} className="h-full" />
       </div>
       <InspectorSheet selected={selected} select={select} side={landscape ? 'right' : 'bottom'} />
     </div>
@@ -313,7 +329,7 @@ function InspectorSheet({ selected, select, side }: Pick<FloorProps, 'selected' 
   )
 }
 
-function PhoneFloor({ role, lens, setLens, selected, select, seating }: FloorProps & { role: RouteRole }) {
+function PhoneFloor({ role, lens, setLens, selected, select, seating, shift }: FloorProps & { role: RouteRole }) {
   const [tab, setTab] = useState<'list' | 'floor'>('list')
   const [sheetFor, setSheetFor] = useState<string | null>(null)
   const staff = role === 'staff'
@@ -345,7 +361,7 @@ function PhoneFloor({ role, lens, setLens, selected, select, seating }: FloorPro
               </div>
             </>
           ) : (
-            <SideList lens={lens} seating={seating} selectedId={selected?.table.table_id ?? null} onSelect={openSheet} className="min-h-full bg-white" />
+            <SideList lens={lens} seating={seating} selectedId={selected?.table.table_id ?? null} onSelect={openSheet} shiftTab={shift} className="min-h-full bg-white" />
           )}
         </div>
       ) : (

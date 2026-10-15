@@ -49,6 +49,11 @@ export function apiScopeKey(): string {
   return `${scope.base}|${scope.headers['X-Demo-Session'] ?? ''}`
 }
 
+/** A raw fetch against the current API scope, for non-JSON responses such as CSV exports. */
+export function scopedFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(`${scope.base}${path}`, { ...init, headers: { ...scope.headers, ...(init.headers ?? {}) } })
+}
+
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers: Record<string, string> = { Accept: 'application/json', ...scope.headers }
   if (options.body !== undefined) headers['Content-Type'] = 'application/json'

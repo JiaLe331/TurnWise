@@ -157,6 +157,7 @@ export interface ShiftMetrics {
   window_start: string
   window_end: string
   durations: MetricSummary[]
+  queue_wait_by_size?: Record<string, MetricSummary>
   counts: Record<string, number>
   vision_review_correction_rate: number | null
   notes: string[]
