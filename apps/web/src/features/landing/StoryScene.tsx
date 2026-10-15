@@ -8,7 +8,7 @@ import { Room } from '@/features/floor-scene/Room'
 import { TableModel } from '@/features/floor-scene/TableModel'
 import type { TableBoardEntry } from '@/lib/api/types'
 import { STORY_TABLE } from './sample'
-import { cameraBlend, chapterAt, CHAPTERS, conceptWeight } from './story'
+import { cameraBlend, cameraStepWeight, chapterAt, CHAPTERS } from './story'
 
 interface CameraParams {
   focus: THREE.Vector3
@@ -129,10 +129,10 @@ function StoryCameraRig({
 }
 
 /**
- * Concept only: a wall camera, its view cone, and a dashed region around the story table.
+ * Camera detection: a wall camera, its view cone, and a dashed region around the story table.
  * Dashed outlines mean "seen by a camera"; they never stand for a confirmed state.
  */
-function ConceptCameraRig({
+function CameraDetectionRig({
   layout,
   progress,
   reducedMotion,
@@ -186,7 +186,7 @@ function ConceptCameraRig({
   useFrame(() => {
     if (!parts || !group.current) return
     const p = progress.current
-    const w = conceptWeight(p)
+    const w = cameraStepWeight(p)
     group.current.visible = w > 0.01
     parts.fade.dome.opacity = w
     parts.fade.lens.opacity = w
@@ -289,7 +289,7 @@ export default function StoryScene({
           />
         )
       })}
-      <ConceptCameraRig layout={layout} progress={progress} reducedMotion={reducedMotion} />
+      <CameraDetectionRig layout={layout} progress={progress} reducedMotion={reducedMotion} />
       <TagProjector layout={layout} tagEls={tagEls} tagKey={tagKey} />
     </Canvas>
   )
