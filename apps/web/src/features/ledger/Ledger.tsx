@@ -12,6 +12,7 @@ import {
   STATE_ORDER,
 } from '@/lib/domain/status'
 import { formatMinutes, minutesSince } from '@/lib/domain/time'
+import { holdsByTable, secondsLeft } from '@/lib/api/seating'
 import type { Lens } from '@/features/lenses/lens'
 
 interface Section {
@@ -119,6 +120,12 @@ interface LedgerProps {
 export function Ledger({ lens, selectedId, onSelect, className }: LedgerProps) {
   const { entries, board, serverNow, freshness } = useBoard()
   const sections = sectionsFor(lens, entries, board?.clearing_queue ?? [], serverNow)
+  const holds = holdsByTable(board)
+  const codes = new Map((board?.waitlist ?? []).map((p) => [p.party_id, p.queue_code]))
+  const heldNote = (tableId: string) => {
+    const hold = holds.get(tableId)
+    return hold ? `Held for ${codes.get(hold.party_id) ?? 'a party'}, ${secondsLeft(hold, serverNow)} s left` : undefined
+  }
 
   return (
     <nav aria-label="Tables" className={cn('flex min-h-0 flex-col', className)}>
@@ -143,7 +150,7 @@ export function Ledger({ lens, selectedId, onSelect, className }: LedgerProps) {
                         <LedgerRow
                           entry={entry}
                           order={order}
-                          note={note}
+                          note={note ?? heldNote(entry.table.table_id)}
                           serverNow={serverNow}
                           selected={entry.table.table_id === selectedId}
                           onSelect={onSelect}

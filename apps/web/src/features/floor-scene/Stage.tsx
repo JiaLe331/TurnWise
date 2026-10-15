@@ -71,6 +71,8 @@ interface StageProps {
   className?: string
   /** Fixed floor plan (e.g. built from camera footage) instead of the illustrative grid. */
   layoutOverride?: FloorLayout
+  /** Tables to highlight in rank order (e.g. seating suggestions); overrides the lens dimming. */
+  spotlight?: string[]
   room?: ReactNode
   azimuth?: number
 }
@@ -83,10 +85,11 @@ export function Stage({
   compact = false,
   className,
   layoutOverride,
+  spotlight,
   room,
   azimuth,
 }: StageProps) {
-  const { entries, serverNow, queuePosition, freshness } = useBoard()
+  const { board, entries, serverNow, queuePosition, freshness } = useBoard()
   const { queued, flagged } = useLensSets()
   const [mode, setMode] = useFloorMode()
   const webgl = useMemo(supportsWebGL, [])
@@ -94,8 +97,23 @@ export function Stage({
   const changed = useChangedTables(entries)
   const tagEls = useRef(new Map<string, HTMLElement>())
 
-  const isDimmed = useCallback((e: TableBoardEntry) => !inLens(lens, e, queued, flagged), [lens, queued, flagged])
-  const order = (id: string) => (lens === 'clearing' ? queuePosition.get(id) : undefined)
+  const spotlightKey = spotlight?.join(',')
+  const isDimmed = useCallback(
+    (e: TableBoardEntry) =>
+      spotlight ? !spotlight.includes(e.table.table_id) : !inLens(lens, e, queued, flagged),
+    [lens, queued, flagged, spotlightKey], // spotlight compared by value
+  )
+  const order = (id: string) => {
+    if (spotlight) {
+      const rank = spotlight.indexOf(id)
+      return rank >= 0 ? rank + 1 : undefined
+    }
+    return lens === 'clearing' ? queuePosition.get(id) : undefined
+  }
+  const heldFor = useMemo(() => {
+    const codes = new Map((board?.waitlist ?? []).map((p) => [p.party_id, p.queue_code]))
+    return new Map((board?.holds ?? []).filter((h) => h.status === 'active').map((h) => [h.table_id, codes.get(h.party_id) ?? 'party']))
+  }, [board])
 
   // Only the table set shapes the layout; state changes never move a table.
   const shapeKey = entries.map((e) => `${e.table.table_id}:${e.table.zone}:${e.table.capacity}:${e.table.attributes.join(',')}`).join('|')
@@ -146,6 +164,7 @@ export function Stage({
                   dimmed={isDimmed(entry)}
                   compact={compact || isDimmed(entry)}
                   order={order(entry.table.table_id)}
+                  held={heldFor.get(entry.table.table_id)}
                   pulse={changed.has(entry.table.table_id)}
                   onSelect={onSelect}
                   tabIndex={-1}

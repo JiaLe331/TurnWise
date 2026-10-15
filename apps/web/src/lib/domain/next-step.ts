@@ -38,7 +38,7 @@ export function nextSteps(entry: TableBoardEntry, actor: Persona | null): NextSt
   }
   if (actor.role === 'host') {
     if (state === 'ready') return NONE
-    return { ...NONE, note: 'Hosts can view tables. Floor staff and managers update them.' }
+    return { ...NONE, note: 'Hosts seat parties at ready tables. Floor staff update the others.' }
   }
 
   const tableStep = (

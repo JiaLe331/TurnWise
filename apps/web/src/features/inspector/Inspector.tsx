@@ -3,6 +3,7 @@ import { useBoard } from '@/lib/api/board'
 import type { TableBoardEntry } from '@/lib/api/types'
 import { CameraEvidenceCard, EvidenceChain } from '@/features/evidence/Evidence'
 import { ManagerActions } from '@/features/manager/ManagerActions'
+import { SeatHere } from '@/features/waitlist/SeatHere'
 import { StateChip } from '@/features/table/StateChip'
 import { nextSteps } from '@/lib/domain/next-step'
 import { elapsedAnchor, openTask } from '@/lib/domain/status'
@@ -114,6 +115,8 @@ export function Inspector({ entry, onClose }: { entry: TableBoardEntry; onClose?
           <ActionArea steps={steps} />
         </section>
       ) : null}
+
+      <SeatHere entry={entry} />
 
       <ManagerActions entry={entry} actor={actor} />
 
