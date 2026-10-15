@@ -34,3 +34,15 @@ export function DropdownRadioItem({ className, ...props }: ComponentProps<typeof
     />
   )
 }
+
+export function DropdownItem({ className, ...props }: ComponentProps<typeof Menu.Item>) {
+  return (
+    <Menu.Item
+      className={cn(
+        'flex cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-[14px] font-semibold outline-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50 data-[highlighted]:bg-wash',
+        className,
+      )}
+      {...props}
+    />
+  )
+}

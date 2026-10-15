@@ -7,7 +7,16 @@ import type { StepInput } from '@/lib/domain/next-step'
 import { compareTableIds } from '@/lib/domain/status'
 import { serverOffsetMs, useNow } from '@/lib/domain/time'
 import { ApiError, apiScopeKey, NetworkError, request } from './client'
-import type { Board, TableBoardEntry } from './types'
+import type {
+  Board,
+  CreateHoldRequest,
+  CreatePartyRequest,
+  HoldActionRequest,
+  PartyActionRequest,
+  QueueParty,
+  SeatingResult,
+  TableBoardEntry,
+} from './types'
 
 const boardKey = () => ['board', OUTLET_ID, apiScopeKey()] as const
 
@@ -83,13 +92,21 @@ export function useBoard(): BoardValue {
   return value
 }
 
-type ActionInput = StepInput
+/** Table and task steps, plus the host's waitlist and seating actions. */
+export type ActionInput =
+  | StepInput
+  | { kind: 'party-create'; request: CreatePartyRequest }
+  | { kind: 'party'; partyId: string; queueCode: string; request: PartyActionRequest }
+  | { kind: 'hold-create'; tableId: string; request: CreateHoldRequest }
+  | { kind: 'hold'; tableId: string; holdId: string; request: HoldActionRequest }
 
 export interface RunOptions {
   /** Toast text on success, e.g. "T4 claimed". Matches the button label's verb. */
   success: string
   /** Called after the server confirms, e.g. to close a dialog. */
   onSuccess?: () => void
+  /** Return true when the caller handles the error itself (no toast), e.g. an override prompt. */
+  onError?: (error: unknown) => boolean
 }
 
 interface MutationVars {
@@ -105,48 +122,92 @@ function newIdempotencyKey(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
-export function actionId(input: { tableId: string; request: { action: string } }): string {
+export function actionId(input: ActionInput | { tableId: string; request: { action: string } }): string {
+  if ('kind' in input) {
+    switch (input.kind) {
+      case 'party-create':
+        return 'party:create'
+      case 'party':
+        return `party:${input.partyId}:${input.request.action}`
+      case 'hold-create':
+        return `hold:${input.request.party_id}:${input.tableId}`
+      case 'hold':
+        return `hold:${input.holdId}:${input.request.action}`
+    }
+  }
   return `${input.tableId}:${input.request.action}`
 }
 
-/** Runs table and task actions with idempotency, version checks, and consistent feedback. */
+/** What an error message should name: the table, or the party's queue code. */
+function subjectOf(input: ActionInput): string {
+  if (input.kind === 'party-create') return input.request.queue_code
+  if (input.kind === 'party') return input.queueCode
+  return input.tableId
+}
+
+function pathOf(input: ActionInput): string {
+  switch (input.kind) {
+    case 'table':
+      return `/tables/${encodeURIComponent(input.tableId)}/actions`
+    case 'task':
+      return `/tasks/${encodeURIComponent(input.taskId)}/actions`
+    case 'party-create':
+      return '/parties'
+    case 'party':
+      return `/parties/${encodeURIComponent(input.partyId)}/actions`
+    case 'hold-create':
+      return '/seating-holds'
+    case 'hold':
+      return `/seating-holds/${encodeURIComponent(input.holdId)}/actions`
+  }
+}
+
+type ActionResult = TableBoardEntry | SeatingResult | QueueParty
+
+/** The table entry an action returned, if any, so the cache can update before the next poll. */
+function entryOf(input: ActionInput, result: ActionResult): TableBoardEntry | null {
+  if (input.kind === 'table' || input.kind === 'task') return result as TableBoardEntry
+  if (input.kind === 'hold-create' || input.kind === 'hold') return (result as SeatingResult).table
+  return null
+}
+
+/** Runs table, task, waitlist and seating actions with idempotency, version checks, and consistent feedback. */
 export function useActions() {
   const queryClient = useQueryClient()
   const { actor } = useIdentity()
   const { freshness } = useBoard()
 
   const mutation = useMutation({
-    mutationFn: ({ input, key }: MutationVars) => {
-      const path =
-        input.kind === 'table'
-          ? `/tables/${encodeURIComponent(input.tableId)}/actions`
-          : `/tasks/${encodeURIComponent(input.taskId)}/actions`
-      return request<TableBoardEntry>(path, {
+    mutationFn: ({ input, key }: MutationVars) =>
+      request<ActionResult>(pathOf(input), {
         method: 'POST',
         body: input.request,
         actor,
         idempotencyKey: key,
-      })
-    },
+      }),
     // Retrying reuses the same variables, so the same idempotency key: the API applies it once.
     retry: (count, error) => error instanceof NetworkError && count < 1,
-    onSuccess: (entry, { options }) => {
-      queryClient.setQueryData<Board>(boardKey(), (board) =>
-        board
-          ? {
-              ...board,
-              tables: board.tables.map((e) =>
-                e.table.table_id === entry.table.table_id ? entry : e,
-              ),
-            }
-          : board,
-      )
+    onSuccess: (result, { input, options }) => {
+      const entry = entryOf(input, result)
+      if (entry) {
+        queryClient.setQueryData<Board>(boardKey(), (board) =>
+          board
+            ? {
+                ...board,
+                tables: board.tables.map((e) => (e.table.table_id === entry.table.table_id ? entry : e)),
+              }
+            : board,
+        )
+      }
       void queryClient.invalidateQueries({ queryKey: boardKey() })
+      void queryClient.invalidateQueries({ queryKey: ['recommendation'] })
       toast.success(options.success)
     },
-    onError: (error, { input }) => {
+    onError: (error, { input, options }) => {
       void queryClient.invalidateQueries({ queryKey: boardKey() })
-      toast.error(describeError(error, input.tableId))
+      void queryClient.invalidateQueries({ queryKey: ['recommendation'] })
+      if (options.onError?.(error)) return
+      toast.error(describeError(error, subjectOf(input)))
     },
   })
 
@@ -169,6 +230,7 @@ export function useActions() {
   }
 }
 
+/** `tableId` names the subject: a table, or a party's queue code for waitlist actions. */
 export function describeError(error: unknown, tableId: string): string {
   if (error instanceof NetworkError) {
     return `Can't reach TurnWise, so ${tableId} was not changed. Try again when the connection returns.`
@@ -185,6 +247,12 @@ export function describeError(error: unknown, tableId: string): string {
         return `${tableId} no longer exists. The board has been refreshed.`
       case 'reason_required':
         return 'Add a reason before saving.'
+      case 'queue_code_in_use':
+        return `${tableId} is already on the waitlist. Use another code.`
+      case 'party_not_waiting':
+        return `${error.message} The board has been refreshed.`
+      case 'hold_not_active':
+        return 'That hold has ended. The board has been refreshed.'
       default:
         return error.message
     }
