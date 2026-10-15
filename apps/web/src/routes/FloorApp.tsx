@@ -1,6 +1,6 @@
 import { Info, List, ListChecks, Map as MapIcon, Users } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'wouter'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { Link, useLocation, useSearchParams } from 'wouter'
 import { Logo, LogoMark } from '@/components/brand/Logo'
 import { PersonaSwitcher } from '@/components/brand/PersonaSwitcher'
 import { DataModeBadge, FreshnessIndicator, OfflineBanner } from '@/components/brand/StatusChrome'
@@ -12,6 +12,13 @@ import { Ledger } from '@/features/ledger/Ledger'
 import { QueueCards } from '@/features/ledger/QueueCards'
 import { ShiftOverview } from '@/features/manager/ShiftOverview'
 import { WaitlistPanel } from '@/features/waitlist/WaitlistPanel'
+import type { Hint } from '@/features/demo/guide'
+import { CameraDock } from '@/features/replay/CameraDock'
+import { GuideStrip } from '@/features/replay/GuideStrip'
+import { ReplayBadge, ReplayStartDialog, SourcePill, SourceSwitch } from '@/features/replay/ReplayControls'
+import { useReplay } from '@/features/replay/ReplayProvider'
+import { REPLAY_PERSONA } from '@/features/replay/replayFloor'
+import { useIdentity } from '@/lib/identity/dev-identity'
 import { useRecommendation, waitlistOf } from '@/lib/api/seating'
 import type { Recommendation } from '@/lib/api/types'
 import { DEFAULT_LENS, LensSwitch, type Lens } from '@/features/lenses/lens'
@@ -67,25 +74,76 @@ export function FloorApp({ role }: { role: RouteRole }) {
   const selected = selectedId ? (byId.get(selectedId) ?? null) : null
   const announcement = useSelectedAnnouncement(selectedId)
   const seating = useSeatingView(role)
+  const replay = useReplay()
+  const inReplay = Boolean(replay.session)
+  const { setActorId } = useIdentity()
+  const [, navigate] = useLocation()
+  const [swapped, setSwapped] = useState(false)
 
   useEffect(() => setLens(DEFAULT_LENS[ROUTE_ROLE[role]]), [role])
+  // In a replay each view acts as that role's person, as the autopilot does.
+  useEffect(() => {
+    if (inReplay) setActorId(REPLAY_PERSONA[role])
+  }, [inReplay, role, setActorId])
+
+  const follow = (hint: Hint) => {
+    const query = new URLSearchParams({ source: 'replay', ...(hint.tableId ? { table: hint.tableId } : {}) })
+    navigate(`/${hint.role}?${query}`)
+  }
+  const openManager = () => navigate('/manager?source=replay')
+  const replayUi: ReplayUi | null = inReplay ? { swapped, follow } : null
+  const right = layout === 'desktop' && (selected || role === 'manager') ? 16 + 372 : 0
+  const left = 16 + 296
+
+  // The dock is always the first child here, so its video (the demo clock) survives layout changes.
+  const dockStyle: CSSProperties | undefined =
+    layout === 'desktop'
+      ? swapped
+        ? {
+            // Below the guide strip, sized to leave a band at the bottom for the small floor card.
+            position: 'absolute',
+            zIndex: 20,
+            top: 176,
+            left: left + 16,
+            width: `min(calc(100% - ${left + right + 32}px), calc((100dvh - 520px) * 16 / 9))`,
+          }
+        : { position: 'absolute', zIndex: 20, right: right + 16, bottom: 68, width: 470 }
+      : layout === 'tablet'
+        ? { position: 'absolute', zIndex: 20, right: 12, bottom: 'calc(45% + 12px)', width: 300 }
+        : undefined
 
   return (
     <div className="fixed inset-0 flex flex-col bg-linen">
-      <AppHeader role={role} layout={layout} />
+      <AppHeader role={role} layout={layout} inReplay={inReplay} />
       <OfflineBanner />
+      <ReplayStartDialog />
       <p className="sr-only" aria-live="polite">
         {announcement}
       </p>
-      {layout === 'desktop' ? (
-        <DesktopFloor lens={lens} setLens={setLens} selected={selected} select={select} seating={seating} shift={role === 'manager'} />
-      ) : layout === 'tablet' ? (
-        <TabletFloor lens={lens} setLens={setLens} selected={selected} select={select} seating={seating} shift={role === 'manager'} />
-      ) : (
-        <PhoneFloor role={role} lens={lens} setLens={setLens} selected={selected} select={select} seating={seating} shift={role === 'manager'} />
-      )}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <CameraDock
+          variant={layout === 'phone' ? 'strip' : swapped && layout === 'desktop' ? 'full' : 'pip'}
+          style={dockStyle}
+          className={layout === 'phone' ? 'mx-2 mt-2 shrink-0' : undefined}
+          onSwap={layout === 'desktop' ? () => setSwapped((v) => !v) : undefined}
+          onOpenManager={openManager}
+        />
+        {layout === 'phone' && replayUi ? <GuideStrip compact onFollow={follow} className="mx-2 mt-2 shrink-0" /> : null}
+        {layout === 'desktop' ? (
+          <DesktopFloor lens={lens} setLens={setLens} selected={selected} select={select} seating={seating} shift={role === 'manager'} replay={replayUi} />
+        ) : layout === 'tablet' ? (
+          <TabletFloor lens={lens} setLens={setLens} selected={selected} select={select} seating={seating} shift={role === 'manager'} replay={replayUi} />
+        ) : (
+          <PhoneFloor role={role} lens={lens} setLens={setLens} selected={selected} select={select} seating={seating} shift={role === 'manager'} replay={replayUi} />
+        )}
+      </div>
     </div>
   )
+}
+
+interface ReplayUi {
+  swapped: boolean
+  follow: (hint: Hint) => void
 }
 
 interface FloorProps {
@@ -97,6 +155,8 @@ interface FloorProps {
   seating: SeatingView | null
   /** The manager view shows the shift overview. */
   shift: boolean
+  /** Replay extras (guide strip, swapped camera); null on the live outlet. */
+  replay: ReplayUi | null
 }
 
 type ListTab = 'waitlist' | 'tables' | 'shift'
@@ -212,7 +272,7 @@ const NAV: { role: RouteRole; href: string }[] = [
   { role: 'manager', href: '/manager' },
 ]
 
-function AppHeader({ role, layout }: { role: RouteRole; layout: ReturnType<typeof useLayout> }) {
+function AppHeader({ role, layout, inReplay }: { role: RouteRole; layout: ReturnType<typeof useLayout>; inReplay: boolean }) {
   const phone = layout === 'phone'
   return (
     <header className="z-10 flex h-14 shrink-0 items-center gap-3 border-b border-rule bg-white px-4 sm:h-[60px] sm:gap-4 sm:px-5">
@@ -223,7 +283,7 @@ function AppHeader({ role, layout }: { role: RouteRole; layout: ReturnType<typeo
         {NAV.map((item) => (
           <Link
             key={item.role}
-            href={item.href}
+            href={inReplay ? `${item.href}?source=replay` : item.href}
             aria-current={item.role === role ? 'page' : undefined}
             className={cn(
               'rounded-lg px-2.5 py-2 text-[14px] font-semibold text-pewter no-underline hover:text-ink sm:px-3 sm:text-[15px]',
@@ -235,11 +295,22 @@ function AppHeader({ role, layout }: { role: RouteRole; layout: ReturnType<typeo
         ))}
       </nav>
       <div className="flex-1" />
-      <DataModeBadge compact={phone} />
-      {phone ? null : <FreshnessIndicator />}
+      {phone ? (
+        <SourcePill />
+      ) : (
+        <>
+          {inReplay ? <ReplayBadge /> : <DataModeBadge />}
+          {layout === 'desktop' ? <FreshnessIndicator /> : null}
+          <SourceSwitch compact={layout !== 'desktop'} />
+        </>
+      )}
       <PersonaSwitcher compact={layout !== 'desktop'} />
     </header>
   )
+}
+
+function ShortNote() {
+  return <>{useFloorModel().shortNote}</>
 }
 
 function IllustrativeNote({ className }: { className?: string }) {
@@ -259,20 +330,31 @@ function IllustrativeNote({ className }: { className?: string }) {
 
 const PANEL = 'rounded-[var(--radius-panel)] border border-rule bg-white shadow-[var(--shadow-float)]'
 
-function DesktopFloor({ lens, setLens, selected, select, seating, shift }: FloorProps) {
+function DesktopFloor({ lens, setLens, selected, select, seating, shift, replay }: FloorProps) {
   const left = 16 + 296
   // The manager's right column always holds something: the inspector, or the shift overview.
   const right = selected || shift ? 16 + 372 : 0
   return (
     <div className="relative min-h-0 flex-1">
-      <Stage
-        className="absolute inset-0"
-        lens={lens}
-        selectedId={selected?.table.table_id ?? null}
-        onSelect={select}
-        insets={{ left, right, top: 64, bottom: 56 }}
-        spotlight={seating?.spotlight}
-      />
+      {/* Swapped during a replay, the floor becomes the small card and the camera fills the stage. */}
+      <div
+        className={cn(
+          replay?.swapped
+            ? 'absolute z-20 h-[180px] w-[300px] overflow-hidden rounded-[14px] border border-rule bg-linen shadow-[var(--shadow-float)]'
+            : 'absolute inset-0',
+        )}
+        style={replay?.swapped ? { right: right + 16, bottom: 68 } : undefined}
+      >
+        <Stage
+          className="absolute inset-0"
+          lens={lens}
+          selectedId={selected?.table.table_id ?? null}
+          onSelect={select}
+          insets={replay?.swapped ? { top: 8, bottom: 8 } : { left, right, top: replay ? 140 : 64, bottom: 56 }}
+          compact={replay?.swapped}
+          spotlight={seating?.spotlight}
+        />
+      </div>
       <aside className={cn(PANEL, 'absolute top-4 bottom-4 left-4 z-10 flex w-[296px] flex-col overflow-hidden')}>
         <SideList lens={lens} seating={seating} selectedId={selected?.table.table_id ?? null} onSelect={select} className="min-h-0 flex-1" />
       </aside>
@@ -282,6 +364,11 @@ function DesktopFloor({ lens, setLens, selected, select, seating, shift }: Floor
       >
         <LensSwitch lens={lens} onChange={setLens} />
       </div>
+      {replay ? (
+        <div className="absolute top-[70px] z-30" style={{ left: left + 16, right: right + 16 }}>
+          <GuideStrip onFollow={replay.follow} />
+        </div>
+      ) : null}
       {/* Bottom-left of the free floor area, leaving the bottom-right for the floor view switch. */}
       <div
         className="pointer-events-none absolute bottom-4 z-10"
@@ -304,12 +391,17 @@ function DesktopFloor({ lens, setLens, selected, select, seating, shift }: Floor
   )
 }
 
-function TabletFloor({ lens, setLens, selected, select, seating, shift }: FloorProps) {
+function TabletFloor({ lens, setLens, selected, select, seating, shift, replay }: FloorProps) {
   const landscape = useMediaQuery('(orientation: landscape)')
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="relative h-[55%] shrink-0 border-b border-rule">
-        <Stage className="absolute inset-0" lens={lens} selectedId={selected?.table.table_id ?? null} onSelect={select} insets={{ top: 60, bottom: 40 }} spotlight={seating?.spotlight} />
+        <Stage className="absolute inset-0" lens={lens} selectedId={selected?.table.table_id ?? null} onSelect={select} insets={{ top: replay ? 150 : 60, bottom: 40 }} spotlight={seating?.spotlight} />
+        {replay ? (
+          <div className="absolute inset-x-3 top-[60px] z-10">
+            <GuideStrip onFollow={replay.follow} />
+          </div>
+        ) : null}
         <div className="absolute top-3 left-1/2 z-10 max-w-[calc(100%-24px)] -translate-x-1/2">
           <LensSwitch lens={lens} onChange={setLens} />
         </div>
@@ -359,7 +451,7 @@ function PhoneFloor({ role, lens, setLens, selected, select, seating, shift }: F
                   onSelect={select}
                 />
                 <p className="pointer-events-none absolute bottom-2 left-2.5 z-10 m-0 rounded-md bg-white/85 px-2 py-0.5 text-[11.5px] font-medium text-pewter">
-                  Illustrative layout
+                  <ShortNote />
                 </p>
               </div>
               <div className="px-4 pt-3.5 pb-6">
@@ -377,7 +469,7 @@ function PhoneFloor({ role, lens, setLens, selected, select, seating, shift }: F
             <LensSwitch lens={lens} onChange={setLens} />
           </div>
           <p className="pointer-events-none absolute bottom-2 left-2.5 z-10 m-0 rounded-md bg-white/85 px-2 py-0.5 text-[11.5px] font-medium text-pewter">
-            Illustrative layout
+            <ShortNote />
           </p>
         </div>
       )}
