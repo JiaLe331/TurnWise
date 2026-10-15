@@ -5,6 +5,7 @@ import { Logo, LogoMark } from '@/components/brand/Logo'
 import { PersonaSwitcher } from '@/components/brand/PersonaSwitcher'
 import { DataModeBadge, FreshnessIndicator, OfflineBanner } from '@/components/brand/StatusChrome'
 import { Dialog, SheetContent } from '@/components/ui/dialog'
+import { useFloorModel } from '@/features/floor-scene/floorModel'
 import { Stage } from '@/features/floor-scene/Stage'
 import { Inspector } from '@/features/inspector/Inspector'
 import { Ledger } from '@/features/ledger/Ledger'
@@ -242,6 +243,7 @@ function AppHeader({ role, layout }: { role: RouteRole; layout: ReturnType<typeo
 }
 
 function IllustrativeNote({ className }: { className?: string }) {
+  const { note } = useFloorModel()
   return (
     <p
       className={cn(
@@ -250,7 +252,7 @@ function IllustrativeNote({ className }: { className?: string }) {
       )}
     >
       <Info className="size-4 shrink-0" aria-hidden />
-      Illustrative layout. Zones come from table data; positions aren't mapped yet.
+      {note}
     </p>
   )
 }
@@ -280,8 +282,12 @@ function DesktopFloor({ lens, setLens, selected, select, seating, shift }: Floor
       >
         <LensSwitch lens={lens} onChange={setLens} />
       </div>
-      <div className="absolute bottom-4 z-10 -translate-x-1/2" style={{ left: `calc(${left}px + (100% - ${left + right}px) / 2)` }}>
-        <IllustrativeNote className="whitespace-nowrap" />
+      {/* Bottom-left of the free floor area, leaving the bottom-right for the floor view switch. */}
+      <div
+        className="pointer-events-none absolute bottom-4 z-10"
+        style={{ left: left + 16, maxWidth: `calc(100% - ${left + right}px - 260px)` }}
+      >
+        <IllustrativeNote />
       </div>
       {selected ? (
         <aside
