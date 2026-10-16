@@ -43,7 +43,7 @@ export function LensSwitch({ lens, onChange, className }: { lens: Lens; onChange
       role="radiogroup"
       aria-label="Floor lens"
       className={cn(
-        'flex gap-0.5 overflow-x-auto rounded-[11px] border border-rule bg-white p-[3px] shadow-[0_6px_18px_rgb(27_39_51/0.08)]',
+        'flex gap-0.5 overflow-x-auto rounded-[11px] border border-rule bg-white p-[3px] shadow-[0_6px_18px_rgb(27_39_51/0.08)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         className,
       )}
     >

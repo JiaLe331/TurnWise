@@ -4,6 +4,7 @@ import type { UserRole } from '@/lib/api/types'
 // show. The API remains the authority and answers 403 for anything this table gets wrong.
 const STAFF: ReadonlySet<UserRole> = new Set(['floor_staff', 'manager'])
 const MANAGER: ReadonlySet<UserRole> = new Set(['manager'])
+const HOSTS: ReadonlySet<UserRole> = new Set(['host', 'manager'])
 
 const PERMISSIONS = {
   request_departure_review: STAFF,
@@ -19,6 +20,13 @@ const PERMISSIONS = {
   release_task: STAFF,
   complete_task: STAFF,
   cancel_task: MANAGER,
+  create_party: HOSTS,
+  update_party: HOSTS,
+  cancel_party: HOSTS,
+  left_party: HOSTS,
+  create_hold: HOSTS,
+  confirm_hold: HOSTS,
+  cancel_hold: HOSTS,
 } as const
 
 export type Permission = keyof typeof PERMISSIONS

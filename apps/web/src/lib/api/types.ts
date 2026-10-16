@@ -157,6 +157,7 @@ export interface ShiftMetrics {
   window_start: string
   window_end: string
   durations: MetricSummary[]
+  queue_wait_by_size?: Record<string, MetricSummary>
   counts: Record<string, number>
   vision_review_correction_rate: number | null
   notes: string[]
@@ -203,5 +204,38 @@ export interface TableActionRequest {
 export interface TaskActionRequest {
   action: TaskAction
   expected_version?: number | null
+  reason?: string | null
+}
+
+export interface CreatePartyRequest {
+  queue_code: string
+  size: number
+  arrival_at?: string | null
+  requirements: string[]
+}
+
+export type PartyAction = 'update' | 'cancel' | 'left'
+
+export interface PartyActionRequest {
+  action: PartyAction
+  expected_version: number
+  size?: number | null
+  requirements?: string[] | null
+  reason?: string | null
+}
+
+export interface CreateHoldRequest {
+  party_id: string
+  table_id: string
+  party_version: number
+  table_version: number
+  override_reason?: string | null
+}
+
+export type HoldAction = 'confirm' | 'cancel'
+
+export interface HoldActionRequest {
+  action: HoldAction
+  expected_version: number
   reason?: string | null
 }

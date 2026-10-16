@@ -44,6 +44,8 @@ interface VideoPanelProps {
   onEnded: () => void
   onRestart: () => void
   timeScale: number
+  /** 'minimal' leaves only the camera name on the picture, for hosts that draw their own controls. */
+  chrome?: 'full' | 'minimal'
 }
 
 /**
@@ -164,11 +166,13 @@ export function VideoPanel(props: VideoPanelProps) {
         <span className="rounded-md bg-black/70 px-2.5 py-1 font-mono text-[12px] tracking-wider text-white">
           {timeline.manifest.name.toUpperCase()}
         </span>
-        <span className="rounded-md bg-black/70 px-2.5 py-1 text-[12px] text-white">
-          Time-lapse replay · {speed}x · demo clock
-        </span>
+        {props.chrome === 'minimal' ? null : (
+          <span className="rounded-md bg-black/70 px-2.5 py-1 text-[12px] text-white">
+            Time-lapse replay · {speed}x · demo clock
+          </span>
+        )}
       </div>
-      <div className="absolute right-3 bottom-3 left-3 flex items-center gap-2">
+      <div className={cn('absolute right-3 bottom-3 left-3 flex items-center gap-2', props.chrome === 'minimal' && 'hidden')}>
         <button
           type="button"
           onClick={() => props.onPlaying(!playing)}

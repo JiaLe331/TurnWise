@@ -14,6 +14,9 @@ import { useIdentity } from '@/lib/identity/dev-identity'
 import { useMediaQuery, usePrefersReducedMotion } from '@/lib/use-media'
 import { DEMO_IDENTITY } from '@/config'
 
+/** The live demo is the recorded replay, running inside the host view. */
+const DEMO_HREF = '/host?source=replay'
+
 const StoryScene = lazy(() => import('@/features/landing/StoryScene'))
 
 const ROLES = [
@@ -98,7 +101,7 @@ export default function Landing() {
           For your team
         </a>
         <Link
-          href="/demo"
+          href={DEMO_HREF}
           className="rounded-[10px] bg-ink px-4 py-2.5 text-[15px] font-bold whitespace-nowrap text-white no-underline hover:bg-[#2a3a49]"
         >
           <span className="sm:hidden">Live demo</span>
@@ -110,7 +113,7 @@ export default function Landing() {
       <ol className="sr-only" aria-label="How a table turns, following one table">
         {STEP_CHAPTERS.map((c) => (
           <li key={c.id}>
-            {c.step!.title}. {c.step!.body} {c.concept ? 'This step is a concept: AI detection is not built yet.' : ''}
+            {c.step!.title}. {c.step!.body}
           </li>
         ))}
       </ol>
@@ -171,7 +174,7 @@ export default function Landing() {
             ) : null}
           </div>
 
-          <ConceptChip />
+          <SampleFloorChip />
           <Hero visible={chapterIndex === 0} onStart={() => scrollToChapter(1)} />
           {chapter.step ? (
             <ChapterCard chapter={chapter} chapterIndex={chapterIndex} onJump={scrollToChapter} onSkip={skipStory} />
@@ -213,11 +216,11 @@ export default function Landing() {
   )
 }
 
-function ConceptChip() {
+function SampleFloorChip() {
   return (
     <p className="pointer-events-none absolute top-[84px] right-4 z-10 m-0 hidden items-center gap-1.5 rounded-[9px] border border-rule bg-white/90 px-2.5 py-1.5 text-[12.5px] font-semibold text-pewter sm:flex lg:right-16">
       <Info className="size-3.5" aria-hidden />
-      Concept walkthrough on a sample floor
+      Walkthrough on a sample floor
     </p>
   )
 }
@@ -239,7 +242,7 @@ function Hero({ visible, onStart }: { visible: boolean; onStart: () => void }) {
         </p>
         <div className="flex flex-wrap gap-3">
           <Link
-            href="/demo"
+            href={DEMO_HREF}
             tabIndex={visible ? undefined : -1}
             className="inline-flex h-12 items-center gap-2 rounded-[10px] bg-ink px-5 text-[16px] font-bold text-white no-underline hover:bg-[#2a3a49]"
           >
@@ -306,10 +309,10 @@ function ChapterCard({
           <span className="tabular ml-auto shrink-0 text-[13px] font-semibold text-pewter">{step.number} of 5</span>
         </div>
         <p className="mt-2.5 mb-0 text-[15px] leading-relaxed text-[#46535e]">{step.body}</p>
-        {chapter.concept ? (
+        {chapter.cameraStep ? (
           <p className="mt-3 mb-0 inline-flex items-center gap-1.5 rounded-md border border-dashed border-review bg-review-tint px-2 py-1 text-[12.5px] font-semibold text-review-deep">
             <ScanEye className="size-3.5" aria-hidden />
-            Concept. AI detection isn't built yet.
+            Detected by camera. Staff decide.
           </p>
         ) : null}
         <div className="mt-4 flex items-center gap-3">
@@ -407,7 +410,7 @@ function StoryCallout({ chapter, wide }: { chapter: Chapter; wide: boolean }) {
             }
           >
             {camera ? <ScanEye className="size-3.5" aria-hidden /> : <UserCheck className="size-3.5" aria-hidden />}
-            {camera ? 'Camera suggestion (concept)' : 'Staff confirmed'}
+            {camera ? 'Camera suggestion' : 'Staff confirmed'}
           </span>
         ) : null}
       </div>

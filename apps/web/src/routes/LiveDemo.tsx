@@ -105,7 +105,11 @@ export default function LiveDemo() {
           {error || timeline.isError ? (
             <p className="mt-3 text-[14px] text-clearing-deep">{error ?? 'Could not load the demo timeline.'}</p>
           ) : null}
-          <p className="mt-6">
+          <p className="mt-6 text-[14px] text-pewter">
+            This is the original demo page. The replay now runs inside the main app:{' '}
+            <Link href="/host?source=replay" className="font-semibold text-ink underline">open it there</Link>.
+          </p>
+          <p className="mt-2">
             <Link href="/" className="text-[14px] text-pewter underline">Back to the overview</Link>
           </p>
         </div>

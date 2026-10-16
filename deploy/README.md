@@ -18,11 +18,13 @@ The API reads Firestore once at startup and then only writes; board polling cost
 
 ```sh
 git clone <repo> turnwise && cd turnwise
-cp .env.example .env    # set SITE_ADDRESS, GOOGLE_CLOUD_PROJECT, FIREBASE_SERVICE_ACCOUNT_JSON, TURNWISE_GATEWAY_TOKEN
+cp .env.example .env    # set SITE_ADDRESS, GOOGLE_CLOUD_PROJECT, FIREBASE_SERVICE_ACCOUNT_JSON, TURNWISE_GATEWAY_TOKEN, GEMINI_API_KEY
 # the live demo video is not in git: create apps/web/public/demo-media/mixkit-720p.mp4 first (see README)
 docker compose -f deploy/docker-compose.yml up -d --build
 curl https://<SITE_ADDRESS>/api/healthz
 ```
+
+`GEMINI_API_KEY` powers the manager's Gemini briefing, ideas and ask-the-shift. It's optional: without it those cards say Gemini isn't set up, and the recorded replay still shows its Gemini table checks, which are saved in the timeline.
 
 Update: `git pull && docker compose -f deploy/docker-compose.yml up -d --build`. The first start with an empty Firestore seeds the demo outlet; later starts load it. To reset the demo, delete the `outlets/demo-outlet` document tree in the Firestore console and restart `api`.
 

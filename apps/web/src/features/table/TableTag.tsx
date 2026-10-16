@@ -13,6 +13,8 @@ interface TableTagProps {
   dimmed?: boolean
   compact?: boolean
   order?: number
+  /** Queue code of the party this table is held for. */
+  held?: string
   /** Briefly highlights the tag after a polled state change. */
   pulse?: boolean
   onSelect?: (id: string) => void
@@ -30,6 +32,7 @@ export function TableTag({
   dimmed,
   compact,
   order,
+  held,
   pulse,
   onSelect,
   style,
@@ -84,6 +87,9 @@ export function TableTag({
         <span className="rounded-[5px] bg-cleaning-tint px-1 text-[10.5px] text-cleaning-deep">
           {initialsFor(owner)}
         </span>
+      ) : null}
+      {held ? (
+        <span className="rounded-[5px] bg-ready-tint px-1 text-[10.5px] text-ready-deep">Held {held}</span>
       ) : null}
     </button>
   )

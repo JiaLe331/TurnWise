@@ -1,15 +1,7 @@
 import { request } from '@/lib/api/client'
 import type { Actor } from '@/lib/api/client'
-import type {
-  QueueParty,
-  Recommendation,
-  SeatingResult,
-  ShiftAnswer,
-  ShiftBriefing,
-  ShiftInsights,
-  ShiftMetrics,
-} from '@/lib/api/types'
-import { OUTLET_ID } from '@/config'
+import type { QueueParty, Recommendation, SeatingResult } from '@/lib/api/types'
+import { shiftApi } from '@/lib/api/shift'
 
 export type DemoMode = 'guided' | 'autoplay'
 
@@ -108,9 +100,9 @@ export const outletApi = {
       actor,
       idempotencyKey: key(),
     }),
-  metrics: () => request<ShiftMetrics>(`/outlets/${OUTLET_ID}/metrics`),
-  briefing: () => request<ShiftBriefing>(`/outlets/${OUTLET_ID}/briefing`),
-  insights: () => request<ShiftInsights>(`/outlets/${OUTLET_ID}/insights`),
-  ask: (question: string) =>
-    request<ShiftAnswer>(`/outlets/${OUTLET_ID}/ask`, { method: 'POST', body: { question } }),
+  // Shift metrics and Gemini calls now live in lib/api/shift.ts, shared with the main manager view.
+  metrics: shiftApi.metrics,
+  briefing: shiftApi.briefing,
+  insights: shiftApi.insights,
+  ask: shiftApi.ask,
 }

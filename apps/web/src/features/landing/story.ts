@@ -25,8 +25,8 @@ export interface Chapter {
   /** Shown in the chapter card; hero and outro have none. */
   step: { number: number; title: string; body: string } | null
   callout: { title: string; text: string; source: CalloutSource; side?: 'left' | 'right' } | null
-  /** Concept-only chapters carry an explicit label. */
-  concept: boolean
+  /** The chapter where camera detection asks staff to check; shows the wall camera and its view. */
+  cameraStep: boolean
   /** Which floor tags to show while this chapter is active. */
   tags: 'all' | 'queue' | 'none'
   camera: CameraKey
@@ -43,7 +43,7 @@ export const CHAPTERS: Chapter[] = [
     guests: true,
     step: null,
     callout: null,
-    concept: false,
+    cameraStep: false,
     tags: 'all',
     camera: {
       focus: null,
@@ -65,7 +65,7 @@ export const CHAPTERS: Chapter[] = [
       body: 'The party owns the table, even when they step away. TurnWise never releases a table on its own.',
     },
     callout: { title: 'Party of four', text: 'Seated 48 minutes. A bag is still on a chair.', source: null },
-    concept: false,
+    cameraStep: false,
     tags: 'none',
     camera: { focus: [STORY_TABLE], zoomK: 2.6, azimuthDeg: 57, elevationDeg: 33, wide: FOCUS_WIDE, phone: FOCUS_PHONE },
   },
@@ -85,7 +85,7 @@ export const CHAPTERS: Chapter[] = [
       source: 'camera',
       side: 'left',
     },
-    concept: true,
+    cameraStep: true,
     tags: 'none',
     camera: {
       focus: [STORY_TABLE],
@@ -108,7 +108,7 @@ export const CHAPTERS: Chapter[] = [
       body: 'Floor staff confirm the party has left with one tap. A clearing task joins the queue.',
     },
     callout: { title: 'Departure confirmed', text: 'One tap from floor staff. A clearing task appears.', source: 'staff' },
-    concept: false,
+    cameraStep: false,
     tags: 'none',
     camera: { focus: [STORY_TABLE], zoomK: 3, azimuthDeg: 50, elevationDeg: 28, wide: FOCUS_WIDE, phone: FOCUS_PHONE },
   },
@@ -123,7 +123,7 @@ export const CHAPTERS: Chapter[] = [
       body: 'Someone claims the task and starts cleaning. Everyone sees who has it, and which table is next in the clearing order.',
     },
     callout: { title: 'Claimed by Ana', text: 'Cleaning started. Nobody doubles up.', source: 'staff' },
-    concept: false,
+    cameraStep: false,
     tags: 'queue',
     camera: { focus: ['T4', 'T5', STORY_TABLE, 'T11'], zoomK: 1.45, azimuthDeg: 48, elevationDeg: 36, wide: FOCUS_WIDE, phone: FOCUS_PHONE },
   },
@@ -138,7 +138,7 @@ export const CHAPTERS: Chapter[] = [
       body: 'Staff mark the table ready. The host sees it straight away and can seat the next party.',
     },
     callout: { title: 'Ready to seat', text: 'Reset for four. Confirmed by floor staff, not the camera.', source: 'staff' },
-    concept: false,
+    cameraStep: false,
     tags: 'none',
     camera: { focus: [STORY_TABLE], zoomK: 2.7, azimuthDeg: 60, elevationDeg: 32, wide: FOCUS_WIDE, phone: FOCUS_PHONE },
   },
@@ -149,7 +149,7 @@ export const CHAPTERS: Chapter[] = [
     guests: false,
     step: null,
     callout: null,
-    concept: false,
+    cameraStep: false,
     tags: 'all',
     camera: {
       focus: null,
@@ -199,9 +199,9 @@ export function cameraBlend(p: number): { from: number; to: number; t: number } 
   return { from: index, to: index, t: 0 }
 }
 
-/** 0..1 visibility of the concept camera rig: fades in and out inside the camera chapter. */
-export function conceptWeight(p: number): number {
-  const i = CHAPTERS.findIndex((c) => c.concept)
+/** 0..1 visibility of the camera detection rig: fades in and out inside the camera chapter. */
+export function cameraStepWeight(p: number): number {
+  const i = CHAPTERS.findIndex((c) => c.cameraStep)
   const { start, end } = BOUNDS[i]
   const span = end - start
   const fadeIn = (p - start) / (span * 0.2)

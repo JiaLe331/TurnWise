@@ -3,6 +3,7 @@ import { useBoard } from '@/lib/api/board'
 import type { TableBoardEntry } from '@/lib/api/types'
 import { CameraEvidenceCard, EvidenceChain } from '@/features/evidence/Evidence'
 import { ManagerActions } from '@/features/manager/ManagerActions'
+import { SeatHere } from '@/features/waitlist/SeatHere'
 import { StateChip } from '@/features/table/StateChip'
 import { nextSteps } from '@/lib/domain/next-step'
 import { elapsedAnchor, openTask } from '@/lib/domain/status'
@@ -115,6 +116,8 @@ export function Inspector({ entry, onClose }: { entry: TableBoardEntry; onClose?
         </section>
       ) : null}
 
+      <SeatHere entry={entry} />
+
       <ManagerActions entry={entry} actor={actor} />
 
       <section className="border-b border-rule px-5 py-4" aria-labelledby="evidence-heading">
@@ -140,9 +143,9 @@ function ActionArea({ steps }: { steps: ReturnType<typeof nextSteps> }) {
     <div className="flex flex-col gap-2">
       {steps.primary ? <StepButton step={steps.primary} block /> : null}
       {steps.secondary.length ? (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {steps.secondary.map((step) => (
-            <StepButton key={step.label} step={step} size="md" className="flex-1" />
+            <StepButton key={step.label} step={step} size="md" className="min-w-fit flex-1" />
           ))}
         </div>
       ) : null}
