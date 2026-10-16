@@ -1,4 +1,4 @@
-import { Info, List, ListChecks, Map as MapIcon, Users } from 'lucide-react'
+import { ArrowLeftRight, Info, List, ListChecks, Map as MapIcon, Users } from 'lucide-react'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Link, useLocation, useSearchParams } from 'wouter'
 import { Logo, LogoMark } from '@/components/brand/Logo'
@@ -13,9 +13,9 @@ import { QueueCards } from '@/features/ledger/QueueCards'
 import { ShiftOverview } from '@/features/manager/ShiftOverview'
 import { WaitlistPanel } from '@/features/waitlist/WaitlistPanel'
 import type { Hint } from '@/features/demo/guide'
-import { CameraDock } from '@/features/replay/CameraDock'
-import { GuideStrip } from '@/features/replay/GuideStrip'
-import { ReplayBadge, ReplayStartDialog, SourcePill, SourceSwitch } from '@/features/replay/ReplayControls'
+import { CameraDock, RAIL_DOCK_HEIGHT } from '@/features/replay/CameraDock'
+import { GuideAutoPause, GuideStrip, ReplayPanel } from '@/features/replay/GuideStrip'
+import { ReplayStartDialog, SourcePill, SourceSwitch } from '@/features/replay/ReplayControls'
 import { useReplay } from '@/features/replay/ReplayProvider'
 import { REPLAY_PERSONA } from '@/features/replay/replayFloor'
 import { useIdentity } from '@/lib/identity/dev-identity'
@@ -91,25 +91,28 @@ export function FloorApp({ role }: { role: RouteRole }) {
     navigate(`/${hint.role}?${query}`)
   }
   const openManager = () => navigate('/manager?source=replay')
-  const replayUi: ReplayUi | null = inReplay ? { swapped, follow } : null
-  const right = layout === 'desktop' && (selected || role === 'manager') ? 16 + 372 : 0
-  const left = 16 + 296
+  const replayUi: ReplayUi | null = inReplay ? { swapped, setSwapped, follow } : null
 
   // The dock is always the first child here, so its video (the demo clock) survives layout changes.
+  // Desktop: the top of the right rail, or centred in the floor area when swapped. Tablet: beside the floor.
+  const floorL = DESKTOP_LEFT + 16
+  const floorR = RAIL + 16
   const dockStyle: CSSProperties | undefined =
     layout === 'desktop'
       ? swapped
-        ? {
-            // Below the guide strip, sized to leave a band at the bottom for the small floor card.
+        ? ({
             position: 'absolute',
             zIndex: 20,
-            top: 176,
-            left: left + 16,
-            width: `min(calc(100% - ${left + right + 32}px), calc((100dvh - 520px) * 16 / 9))`,
-          }
-        : { position: 'absolute', zIndex: 20, right: right + 16, bottom: 68, width: 470 }
+            // Centred in the floor area below the lens bar; the header and controls add 46px to the 16:9 picture.
+            top: 'calc(72px + max(0px, (100% - 88px - (var(--dock-w) * 9 / 16 + 46px)) / 2))',
+            // Viewport units, not %, because the variable is also used inside top (where % means height).
+            '--dock-w': `min(calc(100vw - ${floorL + floorR}px), calc((100dvh - 196px) * 16 / 9))`,
+            width: 'var(--dock-w)',
+            left: `calc(${floorL}px + (100vw - ${floorL + floorR}px - var(--dock-w)) / 2)`,
+          } as CSSProperties)
+        : { position: 'absolute', zIndex: 20, top: 16, right: 16, width: RAIL - 16 }
       : layout === 'tablet'
-        ? { position: 'absolute', zIndex: 20, right: 12, bottom: 'calc(45% + 12px)', width: 300 }
+        ? { position: 'absolute', zIndex: 20, top: 12, right: 12, width: TABLET_RAIL - 12, height: TABLET_DOCK_HEIGHT }
         : undefined
 
   return (
@@ -122,13 +125,14 @@ export function FloorApp({ role }: { role: RouteRole }) {
       </p>
       <div className="relative flex min-h-0 flex-1 flex-col">
         <CameraDock
-          variant={layout === 'phone' ? 'strip' : swapped && layout === 'desktop' ? 'full' : 'pip'}
+          variant={layout === 'phone' ? 'strip' : swapped && layout === 'desktop' ? 'full' : 'rail'}
           style={dockStyle}
           className={layout === 'phone' ? 'mx-2 mt-2 shrink-0' : undefined}
           onSwap={layout === 'desktop' ? () => setSwapped((v) => !v) : undefined}
           onOpenManager={openManager}
         />
-        {layout === 'phone' && replayUi ? <GuideStrip compact onFollow={follow} className="mx-2 mt-2 shrink-0" /> : null}
+        {inReplay ? <GuideAutoPause /> : null}
+        {layout === 'phone' && replayUi ? <GuideStrip onFollow={follow} className="mx-2 mt-2 shrink-0" /> : null}
         {layout === 'desktop' ? (
           <DesktopFloor lens={lens} setLens={setLens} selected={selected} select={select} seating={seating} shift={role === 'manager'} replay={replayUi} />
         ) : layout === 'tablet' ? (
@@ -143,8 +147,16 @@ export function FloorApp({ role }: { role: RouteRole }) {
 
 interface ReplayUi {
   swapped: boolean
+  setSwapped: (swapped: boolean) => void
   follow: (hint: Hint) => void
 }
+
+/** Desktop: left panel width plus its margin; the replay rail's width plus its margin. */
+const DESKTOP_LEFT = 16 + 296
+const RAIL = 16 + 400
+/** Tablet: the replay column beside the floor. */
+const TABLET_RAIL = 12 + 320
+const TABLET_DOCK_HEIGHT = 316
 
 interface FloorProps {
   lens: Lens
@@ -299,7 +311,7 @@ function AppHeader({ role, layout, inReplay }: { role: RouteRole; layout: Return
         <SourcePill />
       ) : (
         <>
-          {inReplay ? <ReplayBadge /> : <DataModeBadge />}
+          {inReplay ? null : <DataModeBadge />}
           {layout === 'desktop' ? <FreshnessIndicator /> : null}
           <SourceSwitch compact={layout !== 'desktop'} />
         </>
@@ -331,29 +343,43 @@ function IllustrativeNote({ className }: { className?: string }) {
 const PANEL = 'rounded-[var(--radius-panel)] border border-rule bg-white shadow-[var(--shadow-float)]'
 
 function DesktopFloor({ lens, setLens, selected, select, seating, shift, replay }: FloorProps) {
-  const left = 16 + 296
-  // The manager's right column always holds something: the inspector, or the shift overview.
-  const right = selected || shift ? 16 + 372 : 0
+  const left = DESKTOP_LEFT
+  // The right side holds the replay rail, or the inspector (the manager's shows the shift overview).
+  const right = replay ? RAIL : selected || shift ? 16 + 372 : 0
+  // A next step being hovered points at its table on the floor.
+  const [pointed, setPointed] = useState<string | null>(null)
+  const spotlight = pointed ? [pointed] : seating?.spotlight
+  const swapped = Boolean(replay?.swapped)
   return (
     <div className="relative min-h-0 flex-1">
-      {/* Swapped during a replay, the floor becomes the small card and the camera fills the stage. */}
+      {/* Swapped during a replay, the floor takes the camera's place at the top of the rail. */}
       <div
         className={cn(
-          replay?.swapped
-            ? 'absolute z-20 h-[180px] w-[300px] overflow-hidden rounded-[14px] border border-rule bg-linen shadow-[var(--shadow-float)]'
+          swapped
+            ? 'absolute top-4 right-4 z-20 overflow-hidden rounded-[var(--radius-panel)] border border-rule bg-linen shadow-[var(--shadow-float)]'
             : 'absolute inset-0',
         )}
-        style={replay?.swapped ? { right: right + 16, bottom: 68 } : undefined}
+        style={swapped ? { width: RAIL - 16, height: RAIL_DOCK_HEIGHT } : undefined}
       >
         <Stage
           className="absolute inset-0"
           lens={lens}
           selectedId={selected?.table.table_id ?? null}
           onSelect={select}
-          insets={replay?.swapped ? { top: 8, bottom: 8 } : { left, right, top: replay ? 140 : 64, bottom: 56 }}
-          compact={replay?.swapped}
-          spotlight={seating?.spotlight}
+          insets={swapped ? { top: 44, bottom: 8 } : { left, right, top: 64, bottom: 56 }}
+          compact={swapped}
+          spotlight={spotlight}
         />
+        {swapped ? (
+          <button
+            type="button"
+            onClick={() => replay?.setSwapped(false)}
+            className="absolute top-2 right-2 z-10 flex items-center gap-1 rounded-lg border border-rule bg-white px-2 py-1 text-[12.5px] font-semibold text-ink shadow-sm hover:bg-wash"
+          >
+            <ArrowLeftRight className="size-3.5" aria-hidden />
+            Floor large
+          </button>
+        ) : null}
       </div>
       <aside className={cn(PANEL, 'absolute top-4 bottom-4 left-4 z-10 flex w-[296px] flex-col overflow-hidden')}>
         <SideList lens={lens} seating={seating} selectedId={selected?.table.table_id ?? null} onSelect={select} className="min-h-0 flex-1" />
@@ -364,19 +390,28 @@ function DesktopFloor({ lens, setLens, selected, select, seating, shift, replay 
       >
         <LensSwitch lens={lens} onChange={setLens} />
       </div>
-      {replay ? (
-        <div className="absolute top-[70px] z-30" style={{ left: left + 16, right: right + 16 }}>
-          <GuideStrip onFollow={replay.follow} />
+      {swapped ? null : (
+        /* Bottom-left of the free floor area, leaving the bottom-right for the floor view switch. */
+        <div
+          className="pointer-events-none absolute bottom-4 z-10"
+          style={{ left: left + 16, maxWidth: `calc(100% - ${left + right}px - 260px)` }}
+        >
+          <IllustrativeNote />
         </div>
-      ) : null}
-      {/* Bottom-left of the free floor area, leaving the bottom-right for the floor view switch. */}
-      <div
-        className="pointer-events-none absolute bottom-4 z-10"
-        style={{ left: left + 16, maxWidth: `calc(100% - ${left + right}px - 260px)` }}
-      >
-        <IllustrativeNote />
-      </div>
-      {selected ? (
+      )}
+      {replay ? (
+        // Under the camera: the inspector for a selected table, otherwise next steps.
+        <aside
+          className={cn(PANEL, 'absolute right-4 bottom-4 z-10 flex flex-col overflow-hidden')}
+          style={{ top: 16 + RAIL_DOCK_HEIGHT + 12, width: RAIL - 16 }}
+        >
+          {selected ? (
+            <Inspector entry={selected} onClose={() => select(null)} />
+          ) : (
+            <ReplayPanel onFollow={replay.follow} onPoint={setPointed} shift={shift} />
+          )}
+        </aside>
+      ) : selected ? (
         <aside
           className={cn(PANEL, 'absolute top-4 right-4 bottom-4 z-10 flex w-[372px] flex-col overflow-hidden animate-[slide-in-right_200ms_ease-out]')}
         >
@@ -395,14 +430,25 @@ function TabletFloor({ lens, setLens, selected, select, seating, shift, replay }
   const landscape = useMediaQuery('(orientation: landscape)')
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="relative h-[55%] shrink-0 border-b border-rule">
-        <Stage className="absolute inset-0" lens={lens} selectedId={selected?.table.table_id ?? null} onSelect={select} insets={{ top: replay ? 150 : 60, bottom: 40 }} spotlight={seating?.spotlight} />
+      {/* In a replay the camera and next step sit in a column beside the floor, so the top grows to fit them. */}
+      <div className={cn('relative shrink-0 border-b border-rule', replay ? 'h-[max(55%,470px)]' : 'h-[55%]')}>
+        <Stage
+          className="absolute inset-0"
+          lens={lens}
+          selectedId={selected?.table.table_id ?? null}
+          onSelect={select}
+          insets={{ top: 60, bottom: 40, right: replay ? TABLET_RAIL : 0 }}
+          spotlight={seating?.spotlight}
+        />
         {replay ? (
-          <div className="absolute inset-x-3 top-[60px] z-10">
+          <div className="absolute right-3 z-10" style={{ top: 12 + TABLET_DOCK_HEIGHT + 8, width: TABLET_RAIL - 12 }}>
             <GuideStrip onFollow={replay.follow} />
           </div>
         ) : null}
-        <div className="absolute top-3 left-1/2 z-10 max-w-[calc(100%-24px)] -translate-x-1/2">
+        <div
+          className="absolute top-3 z-10 -translate-x-1/2"
+          style={{ left: `calc((100% - ${replay ? TABLET_RAIL : 0}px) / 2)`, maxWidth: `calc(100% - ${replay ? TABLET_RAIL : 0}px - 24px)` }}
+        >
           <LensSwitch lens={lens} onChange={setLens} />
         </div>
         <IllustrativeNote className="absolute bottom-3 left-3 z-10 text-[12px]" />

@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
 import { useSearchParams } from 'wouter'
 import { demoApi, type DemoMode, type DemoSessionInfo, type DemoTimeline, type Narration } from '@/features/demo/api'
 import { setApiScope } from '@/lib/api/client'
@@ -31,6 +31,11 @@ interface ReplayValue {
   setSpeed: (speed: number) => void
   setEnded: (ended: boolean) => void
   onTime: (mediaS: number) => void
+  /** Guide hints already shown this session, so Guided mode pauses once per hint across views. */
+  seenHints: MutableRefObject<Set<string>>
+  /** The hint Guided mode last paused for. */
+  freshHint: string | null
+  setFreshHint: (id: string | null) => void
 }
 
 const ReplayContext = createContext<ReplayValue | null>(null)
@@ -56,6 +61,8 @@ export function ReplayProvider({ children }: { children: ReactNode }) {
   const [narration, setNarration] = useState<Narration[]>([])
   const [simNow, setSimNow] = useState<string | null>(null)
   const lastTick = useRef(-1)
+  const seenHints = useRef(new Set<string>())
+  const [freshHint, setFreshHint] = useState<string | null>(null)
   const timeline = useQuery({
     queryKey: ['demo-timeline'],
     queryFn: demoApi.timeline,
@@ -94,6 +101,8 @@ export function ReplayProvider({ children }: { children: ReactNode }) {
         const info = await demoApi.start(chosen)
         setApiScope({ base: '/api/demo', headers: { 'X-Demo-Session': info.session_id } })
         lastTick.current = -1
+        seenHints.current = new Set()
+        setFreshHint(null)
         setMode(chosen)
         setPlaying(true)
         setEnded(false)
@@ -174,8 +183,11 @@ export function ReplayProvider({ children }: { children: ReactNode }) {
       setSpeed,
       setEnded,
       onTime,
+      seenHints,
+      freshHint,
+      setFreshHint,
     }),
-    [session, timeline.data, choosing, starting, error, mode, playing, speed, ended, mediaNow, narration, simNow, start, restart, leave, changeMode, onTime],
+    [session, timeline.data, choosing, starting, error, mode, playing, speed, ended, mediaNow, narration, simNow, start, restart, leave, changeMode, onTime, freshHint],
   )
 
   return <ReplayContext.Provider value={value}>{children}</ReplayContext.Provider>

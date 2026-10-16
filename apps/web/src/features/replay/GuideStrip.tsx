@@ -1,114 +1,207 @@
-import { History, Sparkles } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Cctv, History, ListChecks, Play, Sparkles } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { hints, type Hint } from '@/features/demo/guide'
-import type { Narration } from '@/features/demo/api'
+import { ShiftOverview } from '@/features/manager/ShiftOverview'
 import { useBoard } from '@/lib/api/board'
 import { useRecommendation } from '@/lib/api/seating'
 import { cn } from '@/lib/cn'
+import { KIND_LABEL, withoutSource } from './CameraDock'
 import { useReplay } from './ReplayProvider'
 
-const SOURCE_LABEL: Record<Hint['source'], string> = { camera: 'Camera', gemini: 'Gemini', rules: 'Rules' }
-const ROLE_LABEL: Record<Hint['role'], string> = { host: 'host', staff: 'floor staff', manager: 'manager' }
-/** Narration lines often start with their source ("Camera: …"); drop it where a label already says so. */
-function withoutSource(text: string, label: string): string {
-  return text.startsWith(`${label}: `) ? text.slice(label.length + 2) : text
+const SOURCE: Record<Hint['source'], { label: string; icon: typeof Cctv }> = {
+  camera: { label: 'Camera', icon: Cctv },
+  gemini: { label: 'Gemini', icon: Sparkles },
+  rules: { label: 'Rules', icon: ListChecks },
 }
+const ROLE_LABEL: Record<Hint['role'], string> = { host: 'host', staff: 'floor staff', manager: 'manager' }
 
-const KIND_LABEL: Record<Narration['kind'], string> = {
-  autopilot: 'Team',
-  camera: 'Camera',
-  gemini: 'Gemini',
-  arrival: 'Host stand',
-  rules: 'Rules',
+/** Next steps from the board, camera evidence and Gemini checks, most urgent first. */
+function useHints(): Hint[] {
+  const { entries } = useBoard()
+  const rec = useRecommendation().data
+  return useMemo(() => hints(entries, rec), [entries, rec])
 }
 
 /**
- * "What to do next" during a replay: suggestions from the board, camera evidence and Gemini checks.
- * In Guided mode the replay pauses on each new camera or Gemini event so the viewer can act.
+ * In Guided mode, pauses the replay on each new camera or Gemini event so the viewer can act.
+ * Rendered once for the whole floor so it keeps watching while the inspector is open.
  */
-export function GuideStrip({
-  onFollow,
-  compact = false,
-  className,
-}: {
-  onFollow: (hint: Hint) => void
-  compact?: boolean
-  className?: string
-}) {
-  const replay = useReplay()
-  const { entries } = useBoard()
-  const rec = useRecommendation().data
-  const guide = useMemo(() => hints(entries, rec), [entries, rec])
-  const seen = useRef(new Set<string>())
-  const [fresh, setFresh] = useState<string | null>(null)
-  const { mode, setPlaying } = replay
-
+export function GuideAutoPause() {
+  const guide = useHints()
+  const { session, mode, setPlaying, seenHints, setFreshHint } = useReplay()
   useEffect(() => {
-    const novel = guide.find((h) => h.pause && !seen.current.has(h.id))
-    for (const h of guide) seen.current.add(h.id)
+    if (!session) return
+    const novel = guide.find((h) => h.pause && !seenHints.current.has(h.id))
+    for (const h of guide) seenHints.current.add(h.id)
     if (novel && mode === 'guided') {
       setPlaying(false)
-      setFresh(novel.id)
+      setFreshHint(novel.id)
     }
-  }, [guide, mode, setPlaying])
+  }, [guide, session, mode, setPlaying, seenHints, setFreshHint])
+  return null
+}
 
-  if (!replay.session) return null
-  const shown = guide.slice(0, compact ? 1 : 3)
-  const paused = !replay.playing && !replay.ended && mode === 'guided'
+interface HintProps {
+  onFollow: (hint: Hint) => void
+  /** Hovering or focusing a step points at its table on the floor. */
+  onPoint?: (tableId: string | null) => void
+}
 
+function HintCard({ hint, fresh, detail, onFollow, onPoint }: HintProps & { hint: Hint; fresh: boolean; detail: boolean }) {
+  const { label, icon: Icon } = SOURCE[hint.source]
   return (
-    <section
-      aria-label="What to do next"
-      className={cn('rounded-[12px] border border-rule bg-white/95 px-2.5 py-2 shadow-[var(--shadow-tag)]', className)}
+    <button
+      type="button"
+      onClick={() => onFollow(hint)}
+      onPointerEnter={() => onPoint?.(hint.tableId)}
+      onPointerLeave={() => onPoint?.(null)}
+      onFocus={() => onPoint?.(hint.tableId)}
+      onBlur={() => onPoint?.(null)}
+      className={cn(
+        'flex w-full gap-2.5 rounded-xl border bg-white px-3 py-2.5 text-left hover:border-ink',
+        fresh ? 'border-review ring-2 ring-review/30' : 'border-rule',
+      )}
     >
-      <div className="mb-1.5 flex items-center gap-2 text-[12.5px]">
-        <Sparkles className="size-3.5 text-review" aria-hidden />
-        <b className="shrink-0">What to do next</b>
-        <span className="truncate text-pewter">
-          {paused
-            ? 'Paused so you can act. Press play on the camera when ready.'
-            : mode === 'autoplay'
-              ? 'The team acts on these by itself. Switch to Guided to act yourself.'
-              : 'Camera, Gemini and rules suggest; you decide.'}
+      <Icon className={cn('mt-0.5 size-4 shrink-0', hint.source === 'rules' ? 'text-pewter' : 'text-review')} aria-hidden />
+      <span className="min-w-0 flex-1">
+        <span className="block text-[14px] leading-snug font-bold">{hint.title}</span>
+        {detail && hint.detail ? <span className="mt-0.5 line-clamp-2 block text-[12.5px] leading-snug text-pewter">{hint.detail}</span> : null}
+        <span className="mt-1 block text-[12px] text-pewter">
+          {label}, for {ROLE_LABEL[hint.role]}
         </span>
-        {replay.narration.length ? (
-          <details className="relative ml-auto shrink-0">
-            <summary className="flex cursor-pointer list-none items-center gap-1 rounded-md px-1.5 py-0.5 text-pewter hover:bg-wash">
-              <History className="size-3.5" aria-hidden />
-              Shift log ({replay.narration.length})
-            </summary>
-            <ol className="absolute right-0 z-30 mt-1 max-h-64 w-80 list-none space-y-1 overflow-y-auto rounded-xl border border-rule bg-white p-2.5 text-[12.5px] shadow-[var(--shadow-float)]">
-              {[...replay.narration].reverse().map((n, i) => (
-                <li key={`${n.t}-${i}`}>
-                  <span className="tabular text-pewter">{n.t.toFixed(1)} s</span> <b>{KIND_LABEL[n.kind]}:</b> {withoutSource(n.text, KIND_LABEL[n.kind])}
-                </li>
-              ))}
-            </ol>
-          </details>
-        ) : null}
-      </div>
-      {shown.length === 0 ? (
-        <p className="m-0 text-[13px] text-pewter">All calm. TurnWise will flag the next handoff.</p>
+      </span>
+    </button>
+  )
+}
+
+function PausedBar() {
+  const replay = useReplay()
+  return (
+    <div className="flex items-center gap-2 rounded-xl border border-review/40 bg-review-tint px-3 py-2 text-[13px] text-review-deep">
+      <span className="flex-1 font-semibold">Paused so you can act.</span>
+      <button
+        type="button"
+        onClick={() => replay.setPlaying(true)}
+        className="flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 font-semibold text-ink shadow-sm hover:bg-wash"
+      >
+        <Play className="size-3.5" aria-hidden />
+        Resume
+      </button>
+    </div>
+  )
+}
+
+function NextSteps({ onFollow, onPoint }: HintProps) {
+  const replay = useReplay()
+  const guide = useHints()
+  const paused = !replay.playing && !replay.ended && replay.mode === 'guided'
+  return (
+    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3">
+      {paused ? (
+        <PausedBar />
       ) : (
-        <ul className={cn('m-0 grid list-none gap-1.5 p-0', !compact && 'md:grid-cols-3')}>
-          {shown.map((h) => (
+        <p className="m-0 text-[12.5px] text-pewter">
+          {replay.mode === 'autoplay'
+            ? 'The team acts on these by itself. Switch to Guided to act yourself.'
+            : 'Camera, Gemini and rules suggest; you decide.'}
+        </p>
+      )}
+      {guide.length === 0 ? (
+        <p className="m-0 rounded-xl border border-dashed border-rule px-3 py-4 text-center text-[13px] text-pewter">
+          All calm. TurnWise flags the next handoff here.
+        </p>
+      ) : (
+        <ul className="m-0 grid list-none gap-2 p-0">
+          {guide.slice(0, 4).map((h) => (
             <li key={h.id}>
-              <button
-                type="button"
-                onClick={() => onFollow(h)}
-                className={cn(
-                  'h-full w-full rounded-lg border bg-linen px-2.5 py-1.5 text-left hover:border-ink',
-                  h.id === fresh ? 'border-review ring-2 ring-review/30' : 'border-rule',
-                )}
-              >
-                <span className="block text-[11.5px] font-semibold text-pewter">
-                  {SOURCE_LABEL[h.source]}, for {ROLE_LABEL[h.role]}
-                </span>
-                <span className="block text-[13px] leading-snug font-bold">{h.title}</span>
-              </button>
+              <HintCard hint={h} fresh={h.id === replay.freshHint} detail onFollow={onFollow} onPoint={onPoint} />
             </li>
           ))}
         </ul>
+      )}
+    </div>
+  )
+}
+
+function ShiftLog({ className }: { className?: string }) {
+  const { narration } = useReplay()
+  if (narration.length === 0) return <p className={cn('m-0 p-4 text-[13px] text-pewter', className)}>Nothing has happened yet.</p>
+  return (
+    <ol className={cn('m-0 list-none space-y-2 overflow-y-auto p-3 text-[13px] leading-snug', className)}>
+      {[...narration].reverse().map((n, i) => (
+        <li key={`${n.t}-${i}`} className="flex gap-2.5">
+          <span className="tabular w-11 shrink-0 text-right text-pewter">{n.t.toFixed(1)} s</span>
+          <span>
+            <b>{KIND_LABEL[n.kind]}</b> {withoutSource(n.text, KIND_LABEL[n.kind])}
+          </span>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+type PanelTab = 'next' | 'log' | 'shift'
+
+/** The replay rail's lower panel: next steps, the shift log, and the shift overview for managers. */
+export function ReplayPanel({ onFollow, onPoint, shift }: HintProps & { shift: boolean }) {
+  const replay = useReplay()
+  const [tab, setTab] = useState<PanelTab>('next')
+  useEffect(() => setTab('next'), [shift])
+  const tabs: [PanelTab, string][] = [
+    ['next', 'Next steps'],
+    ['log', 'Log'],
+    ...(shift ? ([['shift', 'Shift']] as [PanelTab, string][]) : []),
+  ]
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div role="tablist" aria-label="Replay" className="flex shrink-0 gap-1 border-b border-rule px-3 pt-2.5">
+        {tabs.map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={tab === id}
+            onClick={() => setTab(id)}
+            className={cn(
+              '-mb-px flex items-center gap-1.5 border-b-2 px-2.5 pb-2 text-[14px] font-semibold',
+              tab === id ? 'border-ink text-ink' : 'border-transparent text-pewter hover:text-ink',
+            )}
+          >
+            {id === 'log' ? <History className="size-3.5" aria-hidden /> : null}
+            {label}
+            {id === 'log' && replay.narration.length ? (
+              <span className="tabular rounded-full bg-wash px-1.5 text-[11.5px] font-bold text-pewter">{replay.narration.length}</span>
+            ) : null}
+          </button>
+        ))}
+      </div>
+      {tab === 'next' ? (
+        <NextSteps onFollow={onFollow} onPoint={onPoint} />
+      ) : tab === 'log' ? (
+        <ShiftLog className="min-h-0 flex-1" />
+      ) : (
+        <ShiftOverview className="min-h-0 flex-1" />
+      )}
+    </div>
+  )
+}
+
+/** The most urgent next step on its own, for tablets and phones. */
+export function GuideStrip({ onFollow, className }: HintProps & { className?: string }) {
+  const replay = useReplay()
+  const guide = useHints()
+  if (!replay.session) return null
+  const paused = !replay.playing && !replay.ended && replay.mode === 'guided'
+  const top = guide[0]
+  return (
+    <section aria-label="Next step" className={cn('grid gap-1.5', className)}>
+      {paused ? <PausedBar /> : null}
+      {top ? (
+        <HintCard hint={top} fresh={top.id === replay.freshHint} detail={false} onFollow={onFollow} />
+      ) : (
+        <p className="m-0 rounded-xl border border-dashed border-rule bg-white px-3 py-2.5 text-[13px] text-pewter">
+          All calm. TurnWise flags the next handoff here.
+        </p>
       )}
     </section>
   )

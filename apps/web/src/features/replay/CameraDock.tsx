@@ -2,18 +2,21 @@ import { ArrowLeftRight, ChevronDown, ChevronUp, Pause, Play, RotateCcw, Sparkle
 import { useState, type CSSProperties } from 'react'
 import { Button } from '@/components/ui/button'
 import type { Narration } from '@/features/demo/api'
-import { VideoPanel } from '@/features/demo/VideoPanel'
+import { SPEEDS, VideoPanel } from '@/features/demo/VideoPanel'
 import { cn } from '@/lib/cn'
 import { useReplay } from './ReplayProvider'
 
 const VIDEO_SRC = '/demo-media/mixkit-720p.mp4'
 
+/** Height of the rail variant, so the panel below it and the swapped floor card can line up. */
+export const RAIL_DOCK_HEIGHT = 362
+
 /** Narration lines often start with their source ("Camera: …"); drop it where a label already says so. */
-function withoutSource(text: string, label: string): string {
+export function withoutSource(text: string, label: string): string {
   return text.startsWith(`${label}: `) ? text.slice(label.length + 2) : text
 }
 
-const KIND_LABEL: Record<Narration['kind'], string> = {
+export const KIND_LABEL: Record<Narration['kind'], string> = {
   autopilot: 'Team',
   camera: 'Camera',
   gemini: 'Gemini',
@@ -21,28 +24,34 @@ const KIND_LABEL: Record<Narration['kind'], string> = {
   rules: 'Rules',
 }
 
-/** The latest narration line, shown over the footage for a few media seconds. */
-function Caption({ narration, media, small }: { narration: Narration[]; media: number; small?: boolean }) {
+function clock(s: number) {
+  return `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}`
+}
+
+/** The latest narration line: over the footage when it's large, under it when it's small. */
+function Caption({ narration, media, below }: { narration: Narration[]; media: number; below?: boolean }) {
   const latest = narration[narration.length - 1]
-  if (small) {
-    // Small cards keep the picture clear: the latest line sits under it instead of over it.
+  if (below) {
     return (
-      <p className="m-0 min-h-[38px] border-t border-rule bg-white px-2.5 py-1.5 text-[12.5px] leading-snug text-ink" aria-live="polite">
-        {latest ? (
-          <>
-            <b className="mr-1 text-[11px] text-review-deep">{KIND_LABEL[latest.kind]}</b>
-            {withoutSource(latest.text, KIND_LABEL[latest.kind])}
-          </>
-        ) : (
-          <span className="text-pewter">Captions appear here as the shift unfolds.</span>
-        )}
+      // The clamp sits on an inner span: as a flex item the paragraph itself can't be a -webkit-box.
+      <p className="m-0 min-h-0 flex-1 overflow-hidden px-3 py-2 text-[13px] leading-snug text-ink" aria-live="polite">
+        <span className="line-clamp-2" title={latest?.text}>
+          {latest ? (
+            <>
+              <b className="mr-1.5 text-[12px] text-review-deep">{KIND_LABEL[latest.kind]}</b>
+              {withoutSource(latest.text, KIND_LABEL[latest.kind])}
+            </>
+          ) : (
+            <span className="text-pewter">What the camera and team do appears here.</span>
+          )}
+        </span>
       </p>
     )
   }
   if (!latest || media - latest.t > 2.5) return null
   return (
-    <div className={cn('pointer-events-none absolute inset-x-3 flex justify-center', small ? 'bottom-14' : 'bottom-16')} aria-live="polite">
-      <p className={cn('m-0 max-w-full rounded-lg bg-black/75 px-3 py-1.5 text-center text-white', small ? 'text-[12.5px]' : 'text-[14px]')}>
+    <div className="pointer-events-none absolute inset-x-3 bottom-16 flex justify-center" aria-live="polite">
+      <p className="m-0 max-w-full rounded-lg bg-black/75 px-3 py-1.5 text-center text-[14px] text-white">
         <b className="mr-1.5 text-[11px] text-[#ecb240]">{KIND_LABEL[latest.kind]}</b>
         {withoutSource(latest.text, KIND_LABEL[latest.kind])}
       </p>
@@ -50,8 +59,59 @@ function Caption({ narration, media, small }: { narration: Narration[]; media: n
   )
 }
 
+/** Play, speed, restart and progress, drawn under the picture where there's no room on it. */
+function Transport() {
+  const replay = useReplay()
+  const duration = replay.session?.duration_s ?? 0
+  const shiftMin = (replay.mediaNow * (replay.session?.time_scale ?? 1)) / 60
+  return (
+    <div className="flex h-10 shrink-0 items-center gap-1.5 border-b border-rule px-2">
+      <button
+        type="button"
+        onClick={() => replay.setPlaying(!replay.playing)}
+        disabled={replay.ended}
+        className="grid size-8 place-items-center rounded-lg text-ink hover:bg-wash disabled:opacity-40"
+        aria-label={replay.playing ? 'Pause replay' : 'Play replay'}
+      >
+        {replay.playing && !replay.ended ? <Pause className="size-4" aria-hidden /> : <Play className="size-4" aria-hidden />}
+      </button>
+      <div role="group" aria-label="Playback speed" className="flex rounded-md bg-wash p-0.5">
+        {SPEEDS.map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => replay.setSpeed(s)}
+            aria-pressed={s === replay.speed}
+            className={cn(
+              'tabular rounded px-1.5 py-0.5 text-[12px] font-semibold',
+              s === replay.speed ? 'bg-white text-ink shadow-sm' : 'text-pewter hover:text-ink',
+            )}
+          >
+            {s}×
+          </button>
+        ))}
+      </div>
+      <button
+        type="button"
+        onClick={replay.restart}
+        className="grid size-8 place-items-center rounded-lg text-ink hover:bg-wash"
+        aria-label="Start a new shift"
+      >
+        <RotateCcw className="size-4" aria-hidden />
+      </button>
+      <div className="mx-1 h-1 min-w-6 flex-1 overflow-hidden rounded-full bg-rule" aria-hidden>
+        <div className="h-full bg-ink" style={{ width: `${duration ? Math.min(100, (replay.mediaNow / duration) * 100) : 0}%` }} />
+      </div>
+      <span className="tabular shrink-0 text-[12px] text-pewter" title={`Shift clock +${shiftMin.toFixed(1)} min`}>
+        {clock(replay.mediaNow)} / {clock(duration)}
+      </span>
+    </div>
+  )
+}
+
 interface CameraDockProps {
-  variant: 'pip' | 'full' | 'strip'
+  /** rail: beside the floor; full: swapped into the floor area; strip: collapsible, on phones. */
+  variant: 'rail' | 'full' | 'strip'
   style?: CSSProperties
   className?: string
   onSwap?: () => void
@@ -66,16 +126,20 @@ export function CameraDock({ variant, style, className, onSwap, onOpenManager }:
   const replay = useReplay()
   const [collapsed, setCollapsed] = useState(false)
   if (!replay.session) return null
-  const small = variant !== 'full'
+  const rail = variant === 'rail'
+  const strip = variant === 'strip'
   const latest = replay.narration[replay.narration.length - 1]
 
   return (
     <section
       aria-label="Camera 02, recorded replay"
-      className={cn('overflow-hidden rounded-[14px] border border-rule bg-white shadow-[var(--shadow-float)]', className)}
-      style={style}
+      className={cn(
+        'flex flex-col overflow-hidden rounded-[var(--radius-panel)] border border-rule bg-white shadow-[var(--shadow-float)]',
+        className,
+      )}
+      style={rail ? { height: RAIL_DOCK_HEIGHT, ...style } : style}
     >
-      <div className="flex items-center gap-1.5 border-b border-rule px-2 py-1.5">
+      <div className="flex h-11 shrink-0 items-center gap-1.5 border-b border-rule px-2">
         <div role="radiogroup" aria-label="Replay mode" className="flex rounded-lg bg-wash p-0.5">
           {(
             [
@@ -99,7 +163,7 @@ export function CameraDock({ variant, style, className, onSwap, onOpenManager }:
             </button>
           ))}
         </div>
-        {variant === 'strip' ? (
+        {strip ? (
           <>
             <button
               type="button"
@@ -110,7 +174,9 @@ export function CameraDock({ variant, style, className, onSwap, onOpenManager }:
               {replay.playing ? <Pause className="size-4" /> : <Play className="size-4" />}
             </button>
             <span className="min-w-0 flex-1 truncate text-[12.5px] text-pewter">
-              {collapsed && latest ? `${KIND_LABEL[latest.kind]}: ${withoutSource(latest.text, KIND_LABEL[latest.kind])}` : `${replay.mediaNow.toFixed(1)} s of ${replay.session.duration_s.toFixed(0)} s`}
+              {collapsed && latest
+                ? `${KIND_LABEL[latest.kind]}: ${withoutSource(latest.text, KIND_LABEL[latest.kind])}`
+                : `${replay.mediaNow.toFixed(1)} s of ${replay.session.duration_s.toFixed(0)} s`}
             </span>
             <button
               type="button"
@@ -133,13 +199,13 @@ export function CameraDock({ variant, style, className, onSwap, onOpenManager }:
                 aria-label={variant === 'full' ? 'Show the floor large' : 'Show the camera large'}
               >
                 <ArrowLeftRight className="size-3.5" aria-hidden />
-                Swap
+                {variant === 'full' ? 'Floor large' : 'Camera large'}
               </button>
             ) : null}
           </>
         )}
       </div>
-      <div className={cn('relative bg-black', collapsed && 'h-0 overflow-hidden')}>
+      <div className={cn('relative shrink-0 bg-black', collapsed && 'h-0 overflow-hidden')}>
         {replay.timeline ? (
           <VideoPanel
             key={replay.session.session_id}
@@ -153,15 +219,16 @@ export function CameraDock({ variant, style, className, onSwap, onOpenManager }:
             onEnded={() => replay.setEnded(true)}
             onRestart={replay.restart}
             timeScale={replay.session.time_scale}
+            chrome={variant === 'full' ? 'full' : 'minimal'}
           />
         ) : (
           <div className="grid aspect-video place-items-center text-[13px] text-white/70">Loading the replay</div>
         )}
-        {small ? null : <Caption narration={replay.narration} media={replay.mediaNow} />}
+        {variant === 'full' ? <Caption narration={replay.narration} media={replay.mediaNow} /> : null}
         {replay.ended ? (
           <div className="absolute inset-0 grid place-items-center bg-black/65 p-3 text-center text-white">
             <div>
-              <p className={cn('m-0 mb-1 font-bold', small ? 'text-[16px]' : 'text-[20px]')}>That was the shift.</p>
+              <p className={cn('m-0 mb-1 font-bold', variant === 'full' ? 'text-[20px]' : 'text-[16px]')}>That was the shift.</p>
               <p className="m-0 mb-3 text-[13px] text-white/80">See the briefing and timings, or run it again.</p>
               <div className="flex flex-wrap justify-center gap-2">
                 <Button tone="primary" size="sm" onClick={onOpenManager}>
@@ -177,7 +244,8 @@ export function CameraDock({ variant, style, className, onSwap, onOpenManager }:
           </div>
         ) : null}
       </div>
-      {small && !collapsed ? <Caption narration={replay.narration} media={replay.mediaNow} small /> : null}
+      {rail ? <Transport /> : null}
+      {rail || (strip && !collapsed) ? <Caption narration={replay.narration} media={replay.mediaNow} below /> : null}
     </section>
   )
 }

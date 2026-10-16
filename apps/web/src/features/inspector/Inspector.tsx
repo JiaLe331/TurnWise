@@ -143,9 +143,9 @@ function ActionArea({ steps }: { steps: ReturnType<typeof nextSteps> }) {
     <div className="flex flex-col gap-2">
       {steps.primary ? <StepButton step={steps.primary} block /> : null}
       {steps.secondary.length ? (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {steps.secondary.map((step) => (
-            <StepButton key={step.label} step={step} size="md" className="flex-1" />
+            <StepButton key={step.label} step={step} size="md" className="min-w-fit flex-1" />
           ))}
         </div>
       ) : null}

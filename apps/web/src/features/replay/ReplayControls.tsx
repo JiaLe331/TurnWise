@@ -21,6 +21,9 @@ const MODES: { mode: DemoMode; label: string; icon: typeof Play; detail: string 
   },
 ]
 
+const REPLAY_NOTE =
+  'Stock time-lapse footage replayed on a demo clock; walk-in parties are scripted. Every action runs through the real rules, in a private session.'
+
 /** Header switch between the live outlet and the recorded replay. */
 export function SourceSwitch({ compact = false }: { compact?: boolean }) {
   const replay = useReplay()
@@ -39,6 +42,7 @@ export function SourceSwitch({ compact = false }: { compact?: boolean }) {
           role="radio"
           aria-checked={on === replayOption}
           aria-label={label}
+          title={replayOption ? REPLAY_NOTE : undefined}
           onClick={() => (replayOption ? (on ? undefined : replay.openChooser()) : on ? replay.leave() : undefined)}
           className={cn(
             'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold whitespace-nowrap',
@@ -70,22 +74,6 @@ export function SourcePill() {
       {on ? <Clapperboard className="size-3.5" aria-hidden /> : <Radio className="size-3.5" aria-hidden />}
       {on ? 'Replay' : 'Demo'}
     </button>
-  )
-}
-
-/** Shown while replaying, in place of the demo-data badge: what the viewer is looking at. */
-export function ReplayBadge({ compact = false }: { compact?: boolean }) {
-  return (
-    <span
-      className="demo-stripes inline-flex items-center gap-1.5 rounded-full border border-demo-rule px-2.5 py-1 text-[13px] font-semibold whitespace-nowrap text-demo"
-      title="Stock time-lapse footage replayed on a demo clock; walk-in parties are scripted. Every action runs through the real rules, in a private session."
-    >
-      <Clapperboard className="size-3.5" aria-hidden />
-      {compact ? 'Replay' : 'Recorded replay'}
-      <span className="sr-only">
-        . Stock time-lapse footage on a demo clock with scripted walk-ins, in a private session.
-      </span>
-    </span>
   )
 }
 
