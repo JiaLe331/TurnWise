@@ -185,3 +185,11 @@ def test_chart_after_answer_ends_the_turn(client, model):
     assert len(model.calls) == 1
     assert "".join(c["delta"] for c in out if c["type"] == "text-delta") == "T2 has waited longest."
     assert any(c["type"] == "tool-output-available" and c["output"] == chart for c in out)
+
+
+def test_bad_tool_arguments_become_an_error_result(client, model):
+    model.steps = [[("call", "get_shift_metrics", {"hours_back": "tonight"})], [("text", "Sorry.")]]
+    out = chunks(post(client, [user("How was tonight?")]))
+    result = next(c for c in out if c["type"] == "tool-output-available")
+    assert "error" in result["output"]
+    assert [c["type"] for c in out][-1] == "finish"

@@ -304,7 +304,11 @@ def chat_stream(ctx: Context, messages: list[dict], end: datetime) -> Iterator[s
             if name == "propose_action":
                 stop = True
                 continue
-            output = run_tool(ctx, name, args, end)
+            try:
+                output = run_tool(ctx, name, args, end)
+            except Exception as err:  # noqa: BLE001 - a bad argument is the model's to fix
+                log.warning("assistant tool %s failed: %s", name, err)
+                output = {"error": f"{name} could not run with {args}"}
             yield _sse({"type": "tool-output-available", "toolCallId": call_id, "output": output})
             model_parts.append(
                 raw[0]
