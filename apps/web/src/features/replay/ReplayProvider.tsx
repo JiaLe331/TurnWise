@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode } from 'react'
 import { useSearchParams } from 'wouter'
 import { demoApi, type DemoMode, type DemoSessionInfo, type DemoTimeline, type Narration } from '@/features/demo/api'
+import { API_BASE } from '@/config'
 import { setApiScope } from '@/lib/api/client'
 
 const TICK_EVERY_S = 0.25 // media seconds between demo-clock updates
@@ -91,7 +92,7 @@ export function ReplayProvider({ children }: { children: ReactNode }) {
   }, [wantsReplay, session, starting])
 
   // Leaving the floor app (for example back to the landing page) ends the scope.
-  useEffect(() => () => setApiScope({ base: '/api' }), [])
+  useEffect(() => () => setApiScope({ base: API_BASE }), [])
 
   const start = useCallback(
     async (chosen: DemoMode) => {
@@ -99,7 +100,7 @@ export function ReplayProvider({ children }: { children: ReactNode }) {
       setError(null)
       try {
         const info = await demoApi.start(chosen)
-        setApiScope({ base: '/api/demo', headers: { 'X-Demo-Session': info.session_id } })
+        setApiScope({ base: `${API_BASE}/demo`, headers: { 'X-Demo-Session': info.session_id } })
         lastTick.current = -1
         seenHints.current = new Set()
         setFreshHint(null)
@@ -122,7 +123,7 @@ export function ReplayProvider({ children }: { children: ReactNode }) {
   )
 
   const leave = useCallback(() => {
-    setApiScope({ base: '/api' })
+    setApiScope({ base: API_BASE })
     setSession(null)
     setChoosing(false)
     setEnded(false)

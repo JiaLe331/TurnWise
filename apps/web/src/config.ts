@@ -14,3 +14,10 @@ export const UNCLAIMED_ALERT_MIN = 10
  * VITE_DEMO_IDENTITY=true for the no-sign-in demo deployment.
  */
 export const DEMO_IDENTITY = import.meta.env.DEV || import.meta.env.VITE_DEMO_IDENTITY === 'true'
+/**
+ * Backend origin for a frontend hosted apart from the API (e.g. https://api.example.com), set at
+ * build time with VITE_BACKEND_URL. Empty means same origin: the dev proxy or Caddy serves /api.
+ */
+export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? ''
+export const API_BASE = `${BACKEND_URL}/api`
+export const DEMO_VIDEO_SRC = `${BACKEND_URL}/demo-media/mixkit-720p.mp4`

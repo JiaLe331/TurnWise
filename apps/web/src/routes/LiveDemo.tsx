@@ -15,11 +15,11 @@ import { Stage } from '@/features/floor-scene/Stage'
 import { Inspector } from '@/features/inspector/Inspector'
 import { QueueCards } from '@/features/ledger/QueueCards'
 import { BoardProvider, useBoard } from '@/lib/api/board'
+import { API_BASE, DEMO_VIDEO_SRC } from '@/config'
 import { setApiScope } from '@/lib/api/client'
 import { cn } from '@/lib/cn'
 import { useIdentity } from '@/lib/identity/dev-identity'
 
-const VIDEO_SRC = '/demo-media/mixkit-720p.mp4'
 const PERSONA: Record<DemoRole, string> = { host: 'host-1', staff: 'staff-ana', manager: 'manager-1' }
 const ROLE_TABS: { role: DemoRole; label: string; icon: typeof UserRound }[] = [
   { role: 'host', label: 'Host', icon: UserRound },
@@ -54,7 +54,7 @@ export default function LiveDemo() {
     setError(null)
     try {
       const info = await demoApi.start(chosen)
-      setApiScope({ base: '/api/demo', headers: { 'X-Demo-Session': info.session_id } })
+      setApiScope({ base: `${API_BASE}/demo`, headers: { 'X-Demo-Session': info.session_id } })
       setSession(info)
     } catch {
       setError('The demo service is not reachable. Start the API and try again.')
@@ -63,7 +63,7 @@ export default function LiveDemo() {
     }
   }, [])
 
-  useEffect(() => () => setApiScope({ base: '/api' }), [])
+  useEffect(() => () => setApiScope({ base: API_BASE }), [])
 
   if (!session || !timeline.data) {
     return (
@@ -235,7 +235,7 @@ function Workspace({
           <div className="relative">
             <VideoPanel
               key={session.session_id}
-              src={VIDEO_SRC}
+              src={DEMO_VIDEO_SRC}
               timeline={timeline}
               speed={speed}
               onSpeed={setSpeed}

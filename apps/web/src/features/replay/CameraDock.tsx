@@ -3,10 +3,10 @@ import { useState, type CSSProperties } from 'react'
 import { Button } from '@/components/ui/button'
 import type { Narration } from '@/features/demo/api'
 import { SPEEDS, VideoPanel } from '@/features/demo/VideoPanel'
+import { DEMO_VIDEO_SRC } from '@/config'
 import { cn } from '@/lib/cn'
 import { useReplay } from './ReplayProvider'
 
-const VIDEO_SRC = '/demo-media/mixkit-720p.mp4'
 
 /** Height of the rail variant, so the panel below it and the swapped floor card can line up. */
 export const RAIL_DOCK_HEIGHT = 362
@@ -209,7 +209,7 @@ export function CameraDock({ variant, style, className, onSwap, onOpenManager }:
         {replay.timeline ? (
           <VideoPanel
             key={replay.session.session_id}
-            src={VIDEO_SRC}
+            src={DEMO_VIDEO_SRC}
             timeline={replay.timeline}
             speed={replay.speed}
             onSpeed={replay.setSpeed}

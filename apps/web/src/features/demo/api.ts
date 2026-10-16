@@ -1,4 +1,5 @@
 import { request } from '@/lib/api/client'
+import { API_BASE } from '@/config'
 import type { Actor } from '@/lib/api/client'
 import type { QueueParty, Recommendation, SeatingResult } from '@/lib/api/types'
 import { shiftApi } from '@/lib/api/shift'
@@ -52,7 +53,7 @@ export interface DemoTimeline {
   }[]
 }
 
-const DEMO_BASE = '/api/demo'
+const DEMO_BASE = `${API_BASE}/demo`
 
 async function raw<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${DEMO_BASE}${path}`, {

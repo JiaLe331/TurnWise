@@ -1,5 +1,5 @@
 import type { UserRole } from './types'
-import { DEMO_IDENTITY } from '@/config'
+import { API_BASE, DEMO_IDENTITY } from '@/config'
 
 export interface Actor {
   id: string
@@ -39,7 +39,7 @@ interface RequestOptions {
  * Where requests go. The live board uses `/api`; the live demo points every request (board,
  * actions, seating, Gemini) at its isolated session under `/api/demo`.
  */
-let scope: { base: string; headers: Record<string, string> } = { base: '/api', headers: {} }
+let scope: { base: string; headers: Record<string, string> } = { base: API_BASE, headers: {} }
 
 export function setApiScope(next: { base: string; headers?: Record<string, string> }): void {
   scope = { base: next.base, headers: next.headers ?? {} }

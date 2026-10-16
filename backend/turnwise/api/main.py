@@ -1,8 +1,10 @@
 import asyncio
 import contextlib
+import os
 from collections.abc import AsyncIterator
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from turnwise.api.deps import get_services
@@ -59,6 +61,15 @@ app = FastAPI(title="TurnWise API", version="0.1.0", lifespan=lifespan)
 for router in (health.router, observations.router, *OUTLET_ROUTERS):
     app.include_router(router)
 app.add_exception_handler(DomainError, handle_domain_error)
+# A frontend hosted on another origin (e.g. Vercel) calls the API directly; covers /demo too.
+if cors_origins := os.environ.get("TURNWISE_CORS_ORIGIN_REGEX"):
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=cors_origins,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["Content-Disposition"],
+    )
 
 # Live demo: the same outlet routes, scoped to a per-viewer session (X-Demo-Session) that replays
 # the precomputed time-lapse on its own clock. Isolated from the live outlet above.
