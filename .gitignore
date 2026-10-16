@@ -20,3 +20,4 @@ apps/web/public/demo-media/
 .DS_Store
 .claude/*.local.md
 **/.claude/*.local.md
+.superpowers/
