@@ -45,6 +45,11 @@ export function setApiScope(next: { base: string; headers?: Record<string, strin
   scope = { base: next.base, headers: next.headers ?? {} }
 }
 
+/** The current scope, read at call time by clients that build their own requests (the assistant chat). */
+export function currentApiScope(): { base: string; headers: Record<string, string> } {
+  return scope
+}
+
 export function apiScopeKey(): string {
   return `${scope.base}|${scope.headers['X-Demo-Session'] ?? ''}`
 }

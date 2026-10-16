@@ -163,3 +163,23 @@ def test_assistant_demo_scope(model):
         )
         assert r.status_code == 200
         assert any(c["type"] == "tool-output-available" for c in chunks(r))
+
+
+def test_floor_now_lists_per_table_timings(services, clock):
+    floor = assistant.run_tool(services.ctx, "get_floor_now", {}, clock.now())
+    by_id = {t["table"]: t for t in floor["tables"]}
+    occupied = [t for t in floor["tables"] if t["state"] == "occupied"]
+    assert occupied and all(t["seated_min"] is not None for t in occupied)
+    assert by_id["T1"]["seats"] >= 1
+
+
+def test_chart_after_answer_ends_the_turn(client, model):
+    chart = {"title": "Seated", "unit": "min", "bars": [{"label": "T2", "value": 40}]}
+    model.steps = [
+        [("text", "T2 has waited longest."), ("call", "show_chart", chart)],
+        [("text", "again")],
+    ]
+    out = chunks(post(client, [user("Compare tables")]))
+    assert len(model.calls) == 1
+    assert "".join(c["delta"] for c in out if c["type"] == "text-delta") == "T2 has waited longest."
+    assert any(c["type"] == "tool-output-available" and c["output"] == chart for c in out)

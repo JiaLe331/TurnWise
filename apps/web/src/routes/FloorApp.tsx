@@ -9,6 +9,8 @@ import { Stage } from '@/features/floor-scene/Stage'
 import { Inspector } from '@/features/inspector/Inspector'
 import { Ledger } from '@/features/ledger/Ledger'
 import { QueueCards } from '@/features/ledger/QueueCards'
+import { AssistantPanel } from '@/features/assistant/AssistantPanel'
+import { apiScopeKey } from '@/lib/api/client'
 import { InsightsStrip } from '@/features/insights/InsightsStrip'
 import { WaitlistPanel } from '@/features/waitlist/WaitlistPanel'
 import type { Hint } from '@/features/demo/guide'
@@ -268,7 +270,7 @@ function SideList({
           className="min-h-0 flex-1"
         />
       ) : seating.tab === 'assistant' && assistantTab ? (
-        <div className="min-h-0 flex-1" />
+        <AssistantPanel key={apiScopeKey()} className="min-h-0 flex-1" />
       ) : (
         <Ledger lens={lens} selectedId={selectedId} onSelect={onSelect} className="min-h-0 flex-1" />
       )}

@@ -12,6 +12,7 @@ from collections.abc import Iterator
 from datetime import datetime, timedelta
 
 from turnwise import gemini
+from turnwise.domain.board import build_board
 from turnwise.domain.briefing import AiUnavailable, briefing_facts
 from turnwise.domain.context import Context, entry_for
 from turnwise.domain.errors import BadRequest, DomainError
@@ -197,11 +198,31 @@ def run_tool(ctx: Context, name: str, args: dict, end: datetime) -> dict:
     if name == "get_shift_metrics":
         return {"hours_back": hours, **{k: facts[k] for k in _METRIC_KEYS}}
     if name == "get_floor_now":
-        return {k: facts[k] for k in _FLOOR_KEYS}
+        return {**{k: facts[k] for k in _FLOOR_KEYS}, "tables": _table_timings(ctx, end)}
     if name == "get_recent_events":
         limit = min(max(int(args.get("limit", 20)), 1), 40)
         return {"events": facts["recent_events"][-limit:]}
     return {"error": f"unknown tool {name}"}
+
+
+def _table_timings(ctx: Context, now: datetime) -> list[dict]:
+    """Per table: state and minutes since it was seated, vacated or made ready."""
+
+    def ago(at: datetime | None) -> float | None:
+        return None if at is None else round((now - at).total_seconds() / 60, 1)
+
+    return [
+        {
+            "table": e.table.table_id,
+            "seats": e.table.capacity,
+            "zone": e.table.zone,
+            "state": e.session.operational_state.value,
+            "seated_min": ago(e.session.seated_at),
+            "departed_min": ago(e.session.departed_at),
+            "ready_min": ago(e.session.ready_at),
+        }
+        for e in build_board(ctx).tables
+    ]
 
 
 def _stream_model(model: str, contents: list, config) -> Iterator[tuple]:
@@ -290,6 +311,9 @@ def chat_stream(ctx: Context, messages: list[dict], end: datetime) -> Iterator[s
             )
             responses.append(types.Part.from_function_response(name=name, response=output))
         yield _sse({"type": "finish-step"})
+        # A chart drawn under an answer already written needs nothing more from the model.
+        if text and all(call[1] == "show_chart" for call in calls):
+            stop = True
         if stop or not responses:
             break
         contents.append(types.Content(role="model", parts=model_parts))
