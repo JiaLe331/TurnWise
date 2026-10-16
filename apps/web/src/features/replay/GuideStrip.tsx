@@ -1,7 +1,6 @@
 import { Cctv, History, ListChecks, Play, Sparkles } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { hints, type Hint } from '@/features/demo/guide'
-import { ShiftOverview } from '@/features/manager/ShiftOverview'
 import { useBoard } from '@/lib/api/board'
 import { useRecommendation } from '@/lib/api/seating'
 import { cn } from '@/lib/cn'
@@ -140,17 +139,15 @@ function ShiftLog({ className }: { className?: string }) {
   )
 }
 
-type PanelTab = 'next' | 'log' | 'shift'
+type PanelTab = 'next' | 'log'
 
-/** The replay rail's lower panel: next steps, the shift log, and the shift overview for managers. */
-export function ReplayPanel({ onFollow, onPoint, shift }: HintProps & { shift: boolean }) {
+/** The replay rail's lower panel: next steps and the shift log. */
+export function ReplayPanel({ onFollow, onPoint }: HintProps) {
   const replay = useReplay()
   const [tab, setTab] = useState<PanelTab>('next')
-  useEffect(() => setTab('next'), [shift])
   const tabs: [PanelTab, string][] = [
     ['next', 'Next steps'],
     ['log', 'Log'],
-    ...(shift ? ([['shift', 'Shift']] as [PanelTab, string][]) : []),
   ]
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -177,10 +174,8 @@ export function ReplayPanel({ onFollow, onPoint, shift }: HintProps & { shift: b
       </div>
       {tab === 'next' ? (
         <NextSteps onFollow={onFollow} onPoint={onPoint} />
-      ) : tab === 'log' ? (
-        <ShiftLog className="min-h-0 flex-1" />
       ) : (
-        <ShiftOverview className="min-h-0 flex-1" />
+        <ShiftLog className="min-h-0 flex-1" />
       )}
     </div>
   )

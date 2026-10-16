@@ -9,7 +9,7 @@ import { Stage } from '@/features/floor-scene/Stage'
 import { Inspector } from '@/features/inspector/Inspector'
 import { Ledger } from '@/features/ledger/Ledger'
 import { QueueCards } from '@/features/ledger/QueueCards'
-import { ShiftOverview } from '@/features/manager/ShiftOverview'
+import { InsightsStrip } from '@/features/insights/InsightsStrip'
 import { WaitlistPanel } from '@/features/waitlist/WaitlistPanel'
 import type { Hint } from '@/features/demo/guide'
 import { CameraDock, RAIL_DOCK_HEIGHT } from '@/features/replay/CameraDock'
@@ -20,7 +20,7 @@ import { REPLAY_PERSONA } from '@/features/replay/replayFloor'
 import { useIdentity } from '@/lib/identity/dev-identity'
 import { useRecommendation, waitlistOf } from '@/lib/api/seating'
 import type { Recommendation } from '@/lib/api/types'
-import { DEFAULT_LENS, LensSwitch, type Lens } from '@/features/lenses/lens'
+import type { Lens } from '@/features/lenses/lens'
 import { useBoard } from '@/lib/api/board'
 import type { UserRole } from '@/lib/api/types'
 import { cn } from '@/lib/cn'
@@ -67,7 +67,8 @@ function useSelectedAnnouncement(selectedId: string | null): string {
 
 export function FloorApp({ role }: { role: RouteRole }) {
   const layout = useLayout()
-  const [lens, setLens] = useState<Lens>(DEFAULT_LENS[ROUTE_ROLE[role]])
+  // The floor always shows every table by status; the old lens filters are gone.
+  const lens: Lens = 'status'
   const [selectedId, select] = useSelectedTable()
   const { byId } = useBoard()
   const selected = selectedId ? (byId.get(selectedId) ?? null) : null
@@ -79,7 +80,6 @@ export function FloorApp({ role }: { role: RouteRole }) {
   const [, navigate] = useLocation()
   const [swapped, setSwapped] = useState(false)
 
-  useEffect(() => setLens(DEFAULT_LENS[ROUTE_ROLE[role]]), [role])
   // In a replay each view acts as that role's person, as the autopilot does.
   useEffect(() => {
     if (inReplay) setActorId(REPLAY_PERSONA[role])
@@ -94,7 +94,7 @@ export function FloorApp({ role }: { role: RouteRole }) {
 
   // The dock is always the first child here, so its video (the demo clock) survives layout changes.
   // Desktop: the top of the right rail, or centred in the floor area when swapped. Tablet: beside the floor.
-  const floorL = DESKTOP_LEFT + 16
+  const floorL = 16 + panelWidth(role === 'manager') + 16
   const floorR = RAIL + 16
   const dockStyle: CSSProperties | undefined =
     layout === 'desktop'
@@ -133,11 +133,11 @@ export function FloorApp({ role }: { role: RouteRole }) {
         {inReplay ? <GuideAutoPause /> : null}
         {layout === 'phone' && replayUi ? <GuideStrip onFollow={follow} className="mx-2 mt-2 shrink-0" /> : null}
         {layout === 'desktop' ? (
-          <DesktopFloor lens={lens} setLens={setLens} selected={selected} select={select} seating={seating} shift={role === 'manager'} replay={replayUi} />
+          <DesktopFloor lens={lens} selected={selected} select={select} seating={seating} shift={role === 'manager'} replay={replayUi} />
         ) : layout === 'tablet' ? (
-          <TabletFloor lens={lens} setLens={setLens} selected={selected} select={select} seating={seating} shift={role === 'manager'} replay={replayUi} />
+          <TabletFloor lens={lens} selected={selected} select={select} seating={seating} shift={role === 'manager'} replay={replayUi} />
         ) : (
-          <PhoneFloor role={role} lens={lens} setLens={setLens} selected={selected} select={select} seating={seating} shift={role === 'manager'} replay={replayUi} />
+          <PhoneFloor role={role} lens={lens} selected={selected} select={select} seating={seating} shift={role === 'manager'} replay={replayUi} />
         )}
       </div>
     </div>
@@ -150,8 +150,9 @@ interface ReplayUi {
   follow: (hint: Hint) => void
 }
 
-/** Desktop: left panel width plus its margin; the replay rail's width plus its margin. */
-const DESKTOP_LEFT = 16 + 296
+/** Desktop left panel width: wider for the manager, whose panel holds the assistant chat. */
+const panelWidth = (manager: boolean) => (manager ? 360 : 296)
+/** Desktop: the replay rail's width plus its margin. */
 const RAIL = 16 + 400
 /** Tablet: the replay column beside the floor. */
 const TABLET_RAIL = 12 + 320
@@ -159,18 +160,17 @@ const TABLET_DOCK_HEIGHT = 316
 
 interface FloorProps {
   lens: Lens
-  setLens: (lens: Lens) => void
   selected: ReturnType<typeof useBoard>['entries'][number] | null
   select: (id: string | null) => void
   /** Waitlist and seating state; null on views that don't seat parties. */
   seating: SeatingView | null
-  /** The manager view shows the shift overview. */
+  /** The manager view: assistant tab and insights strip. */
   shift: boolean
   /** Replay extras (guide strip, swapped camera); null on the live outlet. */
   replay: ReplayUi | null
 }
 
-type ListTab = 'waitlist' | 'tables' | 'shift'
+type ListTab = 'waitlist' | 'tables' | 'assistant'
 
 interface SeatingView {
   tab: ListTab
@@ -188,14 +188,15 @@ interface SeatingView {
 function useSeatingView(role: RouteRole): SeatingView | null {
   const seats = role === 'host' || role === 'manager'
   const { board } = useBoard()
-  const [tab, setTab] = useState<ListTab>(role === 'host' ? 'waitlist' : 'tables')
+  const firstTab: ListTab = role === 'host' ? 'waitlist' : role === 'manager' ? 'assistant' : 'tables'
+  const [tab, setTab] = useState<ListTab>(firstTab)
   const [partyId, setPartyId] = useState<string | null>(null)
   const waitlist = waitlistOf(board)
   // A seated or removed party can't stay selected.
   const activeParty = partyId && waitlist.some((p) => p.party_id === partyId && p.status === 'waiting') ? partyId : null
   const query = useRecommendation(activeParty, seats && waitlist.length > 0)
 
-  useEffect(() => setTab(role === 'host' ? 'waitlist' : 'tables'), [role])
+  useEffect(() => setTab(firstTab), [firstTab])
 
   if (!seats) return null
   const rec = waitlist.length > 0 ? query.data : undefined
@@ -217,15 +218,15 @@ function SideList({
   seating,
   selectedId,
   onSelect,
-  shiftTab = false,
+  assistantTab = false,
   className,
 }: {
   lens: Lens
   seating: SeatingView | null
   selectedId: string | null
   onSelect: (id: string) => void
-  /** Adds a Shift tab (manager on tablet and phone, where there's no right column). */
-  shiftTab?: boolean
+  /** Adds the Assistant tab (manager view). */
+  assistantTab?: boolean
   className?: string
 }) {
   if (!seating) return <Ledger lens={lens} selectedId={selectedId} onSelect={onSelect} className={className} />
@@ -236,7 +237,7 @@ function SideList({
           [
             ['waitlist', 'Waitlist'],
             ['tables', 'Tables'],
-            ...(shiftTab ? ([['shift', 'Shift']] as const) : []),
+            ...(assistantTab ? ([['assistant', 'Assistant']] as const) : []),
           ] as const
         ).map(([id, label]) => (
           <button
@@ -266,8 +267,8 @@ function SideList({
           onSelectTable={onSelect}
           className="min-h-0 flex-1"
         />
-      ) : seating.tab === 'shift' && shiftTab ? (
-        <ShiftOverview className="min-h-0 flex-1" />
+      ) : seating.tab === 'assistant' && assistantTab ? (
+        <div className="min-h-0 flex-1" />
       ) : (
         <Ledger lens={lens} selectedId={selectedId} onSelect={onSelect} className="min-h-0 flex-1" />
       )}
@@ -314,10 +315,10 @@ function AppHeader({ role, layout, inReplay }: { role: RouteRole; layout: Return
 
 const PANEL = 'rounded-[var(--radius-panel)] border border-rule bg-white shadow-[var(--shadow-float)]'
 
-function DesktopFloor({ lens, setLens, selected, select, seating, shift, replay }: FloorProps) {
-  const left = DESKTOP_LEFT
-  // The right side holds the replay rail, or the inspector (the manager's shows the shift overview).
-  const right = replay ? RAIL : selected || shift ? 16 + 372 : 0
+function DesktopFloor({ lens, selected, select, seating, shift, replay }: FloorProps) {
+  const left = 16 + panelWidth(shift)
+  // The right side holds the replay rail, or the inspector.
+  const right = replay ? RAIL : selected ? 16 + 372 : 0
   // A next step being hovered points at its table on the floor.
   const [pointed, setPointed] = useState<string | null>(null)
   const spotlight = pointed ? [pointed] : seating?.spotlight
@@ -353,15 +354,17 @@ function DesktopFloor({ lens, setLens, selected, select, seating, shift, replay 
           </button>
         ) : null}
       </div>
-      <aside className={cn(PANEL, 'absolute top-4 bottom-4 left-4 z-10 flex w-[296px] flex-col overflow-hidden')}>
-        <SideList lens={lens} seating={seating} selectedId={selected?.table.table_id ?? null} onSelect={select} className="min-h-0 flex-1" />
+      <aside className={cn(PANEL, 'absolute top-4 bottom-4 left-4 z-10 flex flex-col overflow-hidden')} style={{ width: panelWidth(shift) }}>
+        <SideList lens={lens} seating={seating} selectedId={selected?.table.table_id ?? null} onSelect={select} assistantTab={shift} className="min-h-0 flex-1" />
       </aside>
-      <div
-        className="absolute top-4 z-10 -translate-x-1/2"
-        style={{ left: `calc(${left}px + (100% - ${left + right}px) / 2)` }}
-      >
-        <LensSwitch lens={lens} onChange={setLens} />
-      </div>
+      {shift ? (
+        <div
+          className="absolute top-4 z-10 -translate-x-1/2"
+          style={{ left: `calc(${left}px + (100% - ${left + right}px) / 2)`, maxWidth: `calc(100% - ${left + right}px - 32px)` }}
+        >
+          <InsightsStrip />
+        </div>
+      ) : null}
       {replay ? (
         // Under the camera: the inspector for a selected table, otherwise next steps.
         <aside
@@ -371,7 +374,7 @@ function DesktopFloor({ lens, setLens, selected, select, seating, shift, replay 
           {selected ? (
             <Inspector entry={selected} onClose={() => select(null)} />
           ) : (
-            <ReplayPanel onFollow={replay.follow} onPoint={setPointed} shift={shift} />
+            <ReplayPanel onFollow={replay.follow} onPoint={setPointed} />
           )}
         </aside>
       ) : selected ? (
@@ -380,16 +383,12 @@ function DesktopFloor({ lens, setLens, selected, select, seating, shift, replay 
         >
           <Inspector entry={selected} onClose={() => select(null)} />
         </aside>
-      ) : shift ? (
-        <aside className={cn(PANEL, 'absolute top-4 right-4 bottom-4 z-10 flex w-[372px] flex-col overflow-hidden')}>
-          <ShiftOverview className="min-h-0 flex-1" />
-        </aside>
       ) : null}
     </div>
   )
 }
 
-function TabletFloor({ lens, setLens, selected, select, seating, shift, replay }: FloorProps) {
+function TabletFloor({ lens, selected, select, seating, shift, replay }: FloorProps) {
   const landscape = useMediaQuery('(orientation: landscape)')
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -408,15 +407,17 @@ function TabletFloor({ lens, setLens, selected, select, seating, shift, replay }
             <GuideStrip onFollow={replay.follow} />
           </div>
         ) : null}
-        <div
-          className="absolute top-3 z-10 -translate-x-1/2"
-          style={{ left: `calc((100% - ${replay ? TABLET_RAIL : 0}px) / 2)`, maxWidth: `calc(100% - ${replay ? TABLET_RAIL : 0}px - 24px)` }}
-        >
-          <LensSwitch lens={lens} onChange={setLens} />
-        </div>
+        {shift ? (
+          <div
+            className="absolute top-3 z-10 -translate-x-1/2"
+            style={{ left: `calc((100% - ${replay ? TABLET_RAIL : 0}px) / 2)`, maxWidth: `calc(100% - ${replay ? TABLET_RAIL : 0}px - 24px)` }}
+          >
+            <InsightsStrip />
+          </div>
+        ) : null}
       </div>
       <div className="min-h-0 flex-1 bg-white">
-        <SideList lens={lens} seating={seating} selectedId={selected?.table.table_id ?? null} onSelect={select} shiftTab={shift} className="h-full" />
+        <SideList lens={lens} seating={seating} selectedId={selected?.table.table_id ?? null} onSelect={select} assistantTab={shift} className="h-full" />
       </div>
       <InspectorSheet selected={selected} select={select} side={landscape ? 'right' : 'bottom'} />
     </div>
@@ -435,7 +436,7 @@ function InspectorSheet({ selected, select, side }: Pick<FloorProps, 'selected' 
   )
 }
 
-function PhoneFloor({ role, lens, setLens, selected, select, seating, shift }: FloorProps & { role: RouteRole }) {
+function PhoneFloor({ role, lens, selected, select, seating, shift }: FloorProps & { role: RouteRole }) {
   const [tab, setTab] = useState<'list' | 'floor'>('list')
   const [sheetFor, setSheetFor] = useState<string | null>(null)
   const staff = role === 'staff'
@@ -464,15 +465,17 @@ function PhoneFloor({ role, lens, setLens, selected, select, seating, shift }: F
               </div>
             </>
           ) : (
-            <SideList lens={lens} seating={seating} selectedId={selected?.table.table_id ?? null} onSelect={openSheet} shiftTab={shift} className="min-h-full bg-white" />
+            <SideList lens={lens} seating={seating} selectedId={selected?.table.table_id ?? null} onSelect={openSheet} assistantTab={shift} className="min-h-full bg-white" />
           )}
         </div>
       ) : (
         <div className="relative min-h-0 flex-1">
           <Stage className="absolute inset-0" lens={lens} selectedId={selected?.table.table_id ?? null} onSelect={openSheet} insets={{ top: 56, bottom: 40 }} spotlight={seating?.spotlight} />
-          <div className="absolute top-2.5 right-2.5 left-2.5 z-10">
-            <LensSwitch lens={lens} onChange={setLens} />
-          </div>
+          {shift ? (
+            <div className="absolute top-2.5 right-2.5 left-2.5 z-10">
+              <InsightsStrip />
+            </div>
+          ) : null}
         </div>
       )}
       <nav aria-label="Phone views" className="flex h-16 shrink-0 border-t border-rule bg-white pb-[env(safe-area-inset-bottom)]">

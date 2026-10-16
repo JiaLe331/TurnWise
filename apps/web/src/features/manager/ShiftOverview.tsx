@@ -1,12 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
-import { Download, Lightbulb, MessageSquare, Send, Sparkles } from 'lucide-react'
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { Download, FileText, Lightbulb } from 'lucide-react'
+import { useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { useBoard } from '@/lib/api/board'
 import { apiScopeKey } from '@/lib/api/client'
 import { shiftApi } from '@/lib/api/shift'
-import type { MetricSummary, ShiftAnswer, ShiftBriefing, ShiftInsights } from '@/lib/api/types'
+import type { MetricSummary, ShiftBriefing, ShiftInsights } from '@/lib/api/types'
 import { cn } from '@/lib/cn'
 
 const DURATIONS: { metric: string; label: string; help: string }[] = [
@@ -83,42 +83,26 @@ function DurationRow({ label, help, summary }: { label: string; help: string; su
   )
 }
 
-/** The manager's shift view: handoff timings from audit events, plus Gemini summaries on request. */
-export function ShiftOverview({ className }: { className?: string }) {
+/** Shift metrics for the current scope, refreshed with each board update. */
+export function useShiftMetrics() {
   const { board } = useBoard()
-  const metrics = useQuery({
+  return useQuery({
     queryKey: ['metrics', apiScopeKey(), board?.generated_at],
     queryFn: shiftApi.metrics,
     enabled: Boolean(board),
     placeholderData: (previous) => previous,
     retry: false,
   })
+}
+
+/** The manager's shift report: handoff timings from audit events, plus Gemini summaries on request. */
+export function ShiftOverview({ className }: { className?: string }) {
+  const metrics = useShiftMetrics()
   const briefing = useOnDemand<ShiftBriefing>(shiftApi.briefing)
   const insights = useOnDemand<ShiftInsights>(shiftApi.insights)
-  const [question, setQuestion] = useState('')
-  const [answers, setAnswers] = useState<ShiftAnswer[]>([])
-  const [asking, setAsking] = useState(false)
-  const [askError, setAskError] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
   const data = metrics.data
   const bySize = Object.entries(data?.queue_wait_by_size ?? {}).filter(([, s]) => s.count > 0)
-
-  async function ask(e: FormEvent) {
-    e.preventDefault()
-    const q = question.trim()
-    if (q.length < 3) return
-    setAsking(true)
-    setAskError(null)
-    try {
-      const answer = await shiftApi.ask(q)
-      setAnswers((previous) => [answer, ...previous].slice(0, 4))
-      setQuestion('')
-    } catch (err) {
-      setAskError(errorText(err))
-    } finally {
-      setAsking(false)
-    }
-  }
 
   async function exportCsv() {
     setExporting(true)
@@ -189,7 +173,7 @@ export function ShiftOverview({ className }: { className?: string }) {
       </section>
 
       <div className="space-y-2.5 px-5 py-4">
-        <Card title="Shift briefing" icon={<Sparkles className="size-4 text-review" aria-hidden />} model={briefing.data?.model}>
+        <Card title="Shift briefing" icon={<FileText className="size-4 text-pewter" aria-hidden />} model={briefing.data?.model}>
           {briefing.data ? (
             <div className="text-[13.5px]">
               <p className="m-0 mb-1.5 font-semibold">{briefing.data.briefing.headline}</p>
@@ -213,7 +197,7 @@ export function ShiftOverview({ className }: { className?: string }) {
           </Button>
         </Card>
 
-        <Card title="Efficiency ideas" icon={<Lightbulb className="size-4 text-review" aria-hidden />} model={insights.data?.model}>
+        <Card title="Efficiency ideas" icon={<Lightbulb className="size-4 text-pewter" aria-hidden />} model={insights.data?.model}>
           {insights.data ? (
             <ul className="m-0 list-none space-y-2 p-0 text-[13.5px]">
               {insights.data.insights.recommendations.map((r) => (
@@ -236,47 +220,6 @@ export function ShiftOverview({ className }: { className?: string }) {
           </Button>
         </Card>
 
-        <Card title="Ask the shift" icon={<MessageSquare className="size-4 text-review" aria-hidden />} model={answers[0]?.model}>
-          <form onSubmit={ask} className="flex gap-2">
-            <input
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              placeholder="e.g. Which table is slowing us down?"
-              aria-label="Question about the shift"
-              maxLength={300}
-              className="h-9 min-w-0 flex-1 rounded-lg border border-[#c9d0ca] bg-white px-3 text-[14px] outline-none focus:border-ink"
-            />
-            <Button size="sm" tone="primary" type="submit" pending={asking} aria-label="Ask">
-              <Send aria-hidden />
-            </Button>
-          </form>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {['What should staff do next?', 'Why is anyone still waiting?', 'Any tables with leftovers?'].map((q) => (
-              <button
-                key={q}
-                type="button"
-                onClick={() => setQuestion(q)}
-                className="rounded-full border border-rule px-2.5 py-1 text-[12px] hover:bg-wash"
-              >
-                {q}
-              </button>
-            ))}
-          </div>
-          {askError ? <p className="m-0 mt-1.5 text-[13px] text-clearing-deep">{askError}</p> : null}
-          {answers.length ? (
-            <ul className="m-0 mt-2 list-none space-y-2 p-0">
-              {answers.map((a) => (
-                <li key={a.question + a.result.answer} className="rounded-lg bg-wash p-2.5 text-[13.5px]">
-                  <p className="m-0 font-semibold">{a.question}</p>
-                  <p className="m-0">{a.result.answer}</p>
-                  <p className="m-0 mt-0.5 text-[12px] text-pewter">
-                    Based on: {a.result.facts_used.join(', ') || 'no matching facts'}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-        </Card>
       </div>
     </div>
   )
