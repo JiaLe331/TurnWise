@@ -22,7 +22,7 @@ export default function App() {
       </Route>
       {/* The replay now runs inside the main views; the original demo page is kept at /demo/classic. */}
       <Route path="/demo">
-        <Redirect to="/host?source=replay" replace />
+        <Redirect to="/manager?source=replay" replace />
       </Route>
       <Route path="/demo/classic">
         <Suspense fallback={null}>

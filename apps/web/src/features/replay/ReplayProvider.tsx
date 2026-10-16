@@ -26,7 +26,6 @@ interface ReplayValue {
   openChooser: () => void
   start: (mode: DemoMode) => Promise<void>
   restart: () => void
-  leave: () => void
   changeMode: (mode: DemoMode) => void
   setPlaying: (playing: boolean) => void
   setSpeed: (speed: number) => void
@@ -47,8 +46,9 @@ const ReplayContext = createContext<ReplayValue | null>(null)
  * Every request goes to the viewer's isolated demo session; the live outlet is never touched.
  */
 export function ReplayProvider({ children }: { children: ReactNode }) {
-  const [params, setParams] = useSearchParams()
-  const wantsReplay = params.get('source') === 'replay'
+  const [, setParams] = useSearchParams()
+  // The recorded replay is the only source the views offer; the live outlet stays API-only.
+  const wantsReplay = true
   const queryClient = useQueryClient()
   const [session, setSession] = useState<DemoSessionInfo | null>(null)
   const [choosing, setChoosing] = useState(false)
@@ -122,15 +122,6 @@ export function ReplayProvider({ children }: { children: ReactNode }) {
     [setSource],
   )
 
-  const leave = useCallback(() => {
-    setApiScope({ base: API_BASE })
-    setSession(null)
-    setChoosing(false)
-    setEnded(false)
-    setNarration([])
-    setSource(false)
-  }, [setSource])
-
   const restart = useCallback(() => void start(mode), [start, mode])
 
   const changeMode = useCallback(
@@ -178,7 +169,6 @@ export function ReplayProvider({ children }: { children: ReactNode }) {
       openChooser: () => setChoosing(true),
       start,
       restart,
-      leave,
       changeMode,
       setPlaying,
       setSpeed,
@@ -188,7 +178,7 @@ export function ReplayProvider({ children }: { children: ReactNode }) {
       freshHint,
       setFreshHint,
     }),
-    [session, timeline.data, choosing, starting, error, mode, playing, speed, ended, mediaNow, narration, simNow, start, restart, leave, changeMode, onTime, freshHint],
+    [session, timeline.data, choosing, starting, error, mode, playing, speed, ended, mediaNow, narration, simNow, start, restart, changeMode, onTime, freshHint],
   )
 
   return <ReplayContext.Provider value={value}>{children}</ReplayContext.Provider>

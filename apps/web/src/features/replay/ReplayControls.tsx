@@ -1,5 +1,6 @@
-import { Clapperboard, Play, Radio, UserRound, Wand2 } from 'lucide-react'
+import { Play, UserRound, Wand2 } from 'lucide-react'
 import { useState } from 'react'
+import { useLocation } from 'wouter'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import type { DemoMode } from '@/features/demo/api'
@@ -21,70 +22,15 @@ const MODES: { mode: DemoMode; label: string; icon: typeof Play; detail: string 
   },
 ]
 
-const REPLAY_NOTE =
-  'Stock time-lapse footage replayed on a demo clock; walk-in parties are scripted. Every action runs through the real rules, in a private session.'
-
-/** Header switch between the live outlet and the recorded replay. */
-export function SourceSwitch({ compact = false }: { compact?: boolean }) {
-  const replay = useReplay()
-  const on = Boolean(replay.session)
-  return (
-    <div role="radiogroup" aria-label="Data source" className="flex rounded-[10px] border border-rule bg-wash p-0.5">
-      {(
-        [
-          [false, 'Live outlet', Radio],
-          [true, 'Recorded replay', Clapperboard],
-        ] as const
-      ).map(([replayOption, label, Icon]) => (
-        <button
-          key={label}
-          type="button"
-          role="radio"
-          aria-checked={on === replayOption}
-          aria-label={label}
-          title={replayOption ? REPLAY_NOTE : undefined}
-          onClick={() => (replayOption ? (on ? undefined : replay.openChooser()) : on ? replay.leave() : undefined)}
-          className={cn(
-            'flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold whitespace-nowrap',
-            on === replayOption ? 'bg-white text-ink shadow-sm' : 'text-pewter hover:text-ink',
-          )}
-        >
-          <Icon className="size-4" aria-hidden />
-          {compact ? null : label}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-/**
- * Phone header: one pill that says which data you're looking at and switches source when tapped
- * (there's no room for both a badge and a switch).
- */
-export function SourcePill() {
-  const replay = useReplay()
-  const on = Boolean(replay.session)
-  return (
-    <button
-      type="button"
-      onClick={() => (on ? replay.leave() : replay.openChooser())}
-      className="demo-stripes inline-flex shrink-0 items-center gap-1.5 rounded-full border border-demo-rule px-2.5 py-1 text-[13px] font-semibold whitespace-nowrap text-demo"
-      aria-label={on ? 'Recorded replay. Tap to return to the live outlet' : 'Demo data. Tap to run the recorded replay'}
-    >
-      {on ? <Clapperboard className="size-3.5" aria-hidden /> : <Radio className="size-3.5" aria-hidden />}
-      {on ? 'Replay' : 'Demo'}
-    </button>
-  )
-}
-
 /** Asks how to run the replay before starting a session. */
 export function ReplayStartDialog() {
   const replay = useReplay()
   const [mode, setMode] = useState<DemoMode>('autoplay')
+  const [, navigate] = useLocation()
   const open = replay.choosing && !replay.session
 
   return (
-    <Dialog open={open} onOpenChange={(o) => (!o ? replay.leave() : undefined)}>
+    <Dialog open={open} onOpenChange={(o) => (!o ? navigate('/') : undefined)}>
       <DialogContent
         title="Run the recorded replay"
         description="Watch a real dining-room camera and see TurnWise turn it into table states, inside these same host, staff and manager screens. The footage is a stock time-lapse on a demo clock, and walk-ins are scripted. Your actions run through the real rules in a private session."

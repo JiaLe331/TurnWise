@@ -15,28 +15,28 @@ import { useMediaQuery, usePrefersReducedMotion } from '@/lib/use-media'
 import { DEMO_IDENTITY } from '@/config'
 
 /** The live demo is the recorded replay, running inside the host view. */
-const DEMO_HREF = '/host?source=replay'
+const DEMO_HREF = '/manager?source=replay'
 
 const StoryScene = lazy(() => import('@/features/landing/StoryScene'))
 
 const ROLES = [
   {
-    href: '/host',
+    href: '/manager?source=replay',
+    persona: 'manager-1',
+    title: 'Manager',
+    body: "Ask the shift assistant, review tonight's numbers, and act on what needs attention.",
+  },
+  {
+    href: '/host?source=replay',
     persona: 'host-1',
     title: 'Host',
     body: 'See which tables are ready, which are being cleared, and how long each party has been seated.',
   },
   {
-    href: '/staff',
+    href: '/staff?source=replay',
     persona: 'staff-ana',
     title: 'Floor staff',
     body: 'Work the clearing queue in order: claim a table, start cleaning, mark it ready.',
-  },
-  {
-    href: '/manager',
-    persona: 'manager-1',
-    title: 'Manager',
-    body: 'Review exceptions, block a table, or correct a state with a recorded reason.',
   },
 ]
 
@@ -188,7 +188,7 @@ export default function Landing() {
           One floor, three ways in
         </h2>
         <p className="mt-2 mb-7 max-w-[560px] text-[16px] leading-relaxed text-pewter">
-          Each role sees the same tables and only the actions it can take. Pick one to open the demo floor.
+          Each role sees the same tables and only the actions it can take. Pick one to open the recorded replay as that role.
         </p>
         <div className="grid gap-3 md:grid-cols-3">
           {ROLES.map((role) => (
@@ -200,7 +200,7 @@ export default function Landing() {
       <footer className="mx-auto flex max-w-[1180px] flex-wrap items-center gap-3 border-t border-rule px-5 py-6 text-[13.5px] text-pewter lg:px-16">
         <Logo className="text-[17px] text-ink" />
         <span className="order-last basis-full sm:order-none sm:basis-0 sm:flex-1">
-          Demo build. Seeded data resets when the API restarts.
+          Demo build. The replay uses stock footage and scripted walk-ins.
         </span>
         <span className="flex-1 sm:hidden" />
         <button
@@ -249,13 +249,6 @@ function Hero({ visible, onStart }: { visible: boolean; onStart: () => void }) {
             <Play className="size-4" aria-hidden />
             Watch the live demo
           </Link>
-          <Link
-            href="/staff"
-            tabIndex={visible ? undefined : -1}
-            className="inline-flex h-12 items-center rounded-[10px] border border-[#c9d0ca] bg-white px-5 text-[16px] font-bold text-ink no-underline hover:bg-wash"
-          >
-            Open the demo floor
-          </Link>
           <button
             type="button"
             tabIndex={visible ? undefined : -1}
@@ -266,10 +259,6 @@ function Hero({ visible, onStart }: { visible: boolean; onStart: () => void }) {
             Follow one table
           </button>
         </div>
-        <p className="mt-4 hidden items-start gap-2 text-[14px] leading-normal font-medium text-pewter sm:flex">
-          <Info className="mt-0.5 size-4 shrink-0" aria-hidden />
-          The live demo replays real dining-room footage with camera detection and Gemini; the demo floor runs on seeded tables.
-        </p>
       </div>
       <p className="absolute bottom-6 left-1/2 m-0 flex -translate-x-1/2 items-center gap-2 text-[14px] font-semibold whitespace-nowrap text-pewter">
         <ArrowDown className="size-4 animate-bounce motion-reduce:animate-none" aria-hidden />
@@ -438,16 +427,16 @@ function OutroPanel() {
         </p>
         <div className="flex flex-col items-center justify-center gap-2 sm:flex-row">
           <Link
-            href="/staff"
+            href={DEMO_HREF}
             className="inline-flex h-12 w-full items-center justify-center rounded-[10px] bg-ink px-5 text-[16px] font-bold text-white no-underline hover:bg-[#2a3a49] sm:w-auto"
           >
-            Open the demo floor
+            Watch the live demo
           </Link>
-          <Link href="/host" className="inline-flex h-12 items-center rounded-[10px] px-4 text-[15px] font-semibold text-ink no-underline hover:bg-wash">
+          <Link href="/host?source=replay" className="inline-flex h-12 items-center rounded-[10px] px-4 text-[15px] font-semibold text-ink no-underline hover:bg-wash">
             Host view
           </Link>
-          <Link href="/manager" className="inline-flex h-12 items-center rounded-[10px] px-4 text-[15px] font-semibold text-ink no-underline hover:bg-wash">
-            Manager view
+          <Link href="/staff?source=replay" className="inline-flex h-12 items-center rounded-[10px] px-4 text-[15px] font-semibold text-ink no-underline hover:bg-wash">
+            Floor staff view
           </Link>
         </div>
       </div>

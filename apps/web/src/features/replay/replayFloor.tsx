@@ -6,8 +6,6 @@ export const REPLAY_FLOOR: FloorModel = {
   layout: MIXKIT_LAYOUT,
   room: <MixkitRoom />,
   azimuth: MIXKIT_AZIMUTH,
-  note: 'Floor plan built from Camera 02.',
-  shortNote: 'Built from Camera 02',
 }
 
 /** Who acts in each view during a replay, matching the autopilot's people. */

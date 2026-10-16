@@ -13,16 +13,10 @@ export interface FloorModel {
   room?: ReactNode
   /** Camera angle around the room, in radians. */
   azimuth?: number
-  /** Honest one-line note shown on the floor. */
-  note: string
-  /** The same note in a few words, for small screens. */
-  shortNote: string
 }
 
 export const LIVE_FLOOR: FloorModel = {
   layout: null,
-  note: "Illustrative layout. Zones come from table data; positions aren't mapped yet.",
-  shortNote: 'Illustrative layout',
 }
 
 const FloorModelContext = createContext<FloorModel>(LIVE_FLOOR)

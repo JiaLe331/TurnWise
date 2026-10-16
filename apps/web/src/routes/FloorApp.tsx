@@ -1,11 +1,10 @@
-import { ArrowLeftRight, Info, List, ListChecks, Map as MapIcon, Users } from 'lucide-react'
+import { ArrowLeftRight, List, ListChecks, Map as MapIcon, Users } from 'lucide-react'
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Link, useLocation, useSearchParams } from 'wouter'
 import { Logo, LogoMark } from '@/components/brand/Logo'
 import { PersonaSwitcher } from '@/components/brand/PersonaSwitcher'
-import { DataModeBadge, FreshnessIndicator, OfflineBanner } from '@/components/brand/StatusChrome'
+import { FreshnessIndicator, OfflineBanner } from '@/components/brand/StatusChrome'
 import { Dialog, SheetContent } from '@/components/ui/dialog'
-import { useFloorModel } from '@/features/floor-scene/floorModel'
 import { Stage } from '@/features/floor-scene/Stage'
 import { Inspector } from '@/features/inspector/Inspector'
 import { Ledger } from '@/features/ledger/Ledger'
@@ -15,7 +14,7 @@ import { WaitlistPanel } from '@/features/waitlist/WaitlistPanel'
 import type { Hint } from '@/features/demo/guide'
 import { CameraDock, RAIL_DOCK_HEIGHT } from '@/features/replay/CameraDock'
 import { GuideAutoPause, GuideStrip, ReplayPanel } from '@/features/replay/GuideStrip'
-import { ReplayStartDialog, SourcePill, SourceSwitch } from '@/features/replay/ReplayControls'
+import { ReplayStartDialog } from '@/features/replay/ReplayControls'
 import { useReplay } from '@/features/replay/ReplayProvider'
 import { REPLAY_PERSONA } from '@/features/replay/replayFloor'
 import { useIdentity } from '@/lib/identity/dev-identity'
@@ -279,9 +278,9 @@ function SideList({
 const PHONE_LABEL: Record<RouteRole, string> = { host: 'Host', staff: 'Staff', manager: 'Manager' }
 
 const NAV: { role: RouteRole; href: string }[] = [
+  { role: 'manager', href: '/manager' },
   { role: 'host', href: '/host' },
   { role: 'staff', href: '/staff' },
-  { role: 'manager', href: '/manager' },
 ]
 
 function AppHeader({ role, layout, inReplay }: { role: RouteRole; layout: ReturnType<typeof useLayout>; inReplay: boolean }) {
@@ -307,36 +306,9 @@ function AppHeader({ role, layout, inReplay }: { role: RouteRole; layout: Return
         ))}
       </nav>
       <div className="flex-1" />
-      {phone ? (
-        <SourcePill />
-      ) : (
-        <>
-          {inReplay ? null : <DataModeBadge />}
-          {layout === 'desktop' ? <FreshnessIndicator /> : null}
-          <SourceSwitch compact={layout !== 'desktop'} />
-        </>
-      )}
+      {phone ? null : <FreshnessIndicator />}
       <PersonaSwitcher compact={layout !== 'desktop'} />
     </header>
-  )
-}
-
-function ShortNote() {
-  return <>{useFloorModel().shortNote}</>
-}
-
-function IllustrativeNote({ className }: { className?: string }) {
-  const { note } = useFloorModel()
-  return (
-    <p
-      className={cn(
-        'pointer-events-none m-0 flex items-center gap-2 rounded-[9px] border border-rule bg-white/90 px-3 py-1.5 text-[13px] font-medium text-pewter',
-        className,
-      )}
-    >
-      <Info className="size-4 shrink-0" aria-hidden />
-      {note}
-    </p>
   )
 }
 
@@ -390,15 +362,6 @@ function DesktopFloor({ lens, setLens, selected, select, seating, shift, replay 
       >
         <LensSwitch lens={lens} onChange={setLens} />
       </div>
-      {swapped ? null : (
-        /* Bottom-left of the free floor area, leaving the bottom-right for the floor view switch. */
-        <div
-          className="pointer-events-none absolute bottom-4 z-10"
-          style={{ left: left + 16, maxWidth: `calc(100% - ${left + right}px - 260px)` }}
-        >
-          <IllustrativeNote />
-        </div>
-      )}
       {replay ? (
         // Under the camera: the inspector for a selected table, otherwise next steps.
         <aside
@@ -451,7 +414,6 @@ function TabletFloor({ lens, setLens, selected, select, seating, shift, replay }
         >
           <LensSwitch lens={lens} onChange={setLens} />
         </div>
-        <IllustrativeNote className="absolute bottom-3 left-3 z-10 text-[12px]" />
       </div>
       <div className="min-h-0 flex-1 bg-white">
         <SideList lens={lens} seating={seating} selectedId={selected?.table.table_id ?? null} onSelect={select} shiftTab={shift} className="h-full" />
@@ -496,9 +458,6 @@ function PhoneFloor({ role, lens, setLens, selected, select, seating, shift }: F
                   selectedId={selected?.table.table_id ?? null}
                   onSelect={select}
                 />
-                <p className="pointer-events-none absolute bottom-2 left-2.5 z-10 m-0 rounded-md bg-white/85 px-2 py-0.5 text-[11.5px] font-medium text-pewter">
-                  <ShortNote />
-                </p>
               </div>
               <div className="px-4 pt-3.5 pb-6">
                 <QueueCards selectedId={selected?.table.table_id ?? null} onSelect={select} />
@@ -514,9 +473,6 @@ function PhoneFloor({ role, lens, setLens, selected, select, seating, shift }: F
           <div className="absolute top-2.5 right-2.5 left-2.5 z-10">
             <LensSwitch lens={lens} onChange={setLens} />
           </div>
-          <p className="pointer-events-none absolute bottom-2 left-2.5 z-10 m-0 rounded-md bg-white/85 px-2 py-0.5 text-[11.5px] font-medium text-pewter">
-            <ShortNote />
-          </p>
         </div>
       )}
       <nav aria-label="Phone views" className="flex h-16 shrink-0 border-t border-rule bg-white pb-[env(safe-area-inset-bottom)]">

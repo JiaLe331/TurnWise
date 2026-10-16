@@ -10,9 +10,9 @@ export function NotFound() {
         <p className="mt-3 text-pewter">Open one of the role views to see the tables.</p>
         <div className="mt-5 flex justify-center gap-2">
           {[
-            ['/host', 'Host'],
-            ['/staff', 'Floor staff'],
-            ['/manager', 'Manager'],
+            ['/manager?source=replay', 'Manager'],
+            ['/host?source=replay', 'Host'],
+            ['/staff?source=replay', 'Floor staff'],
           ].map(([href, label]) => (
             <Link key={href} href={href} className="rounded-[9px] border border-rule bg-white px-3.5 py-2 font-semibold text-ink no-underline hover:bg-wash">
               {label}
