@@ -7,6 +7,8 @@ COPY pyproject.toml uv.lock .python-version ./
 RUN uv sync --frozen --no-dev --no-install-project
 COPY turnwise ./turnwise
 COPY config ./config
+# The recorded replay's timeline and camera manifest, read by /api/demo.
+COPY demo ./demo
 EXPOSE 8000
 # One process only: the API keeps the outlet state in memory and is the single Firestore writer.
 CMD ["uv", "run", "--no-sync", "uvicorn", "turnwise.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
