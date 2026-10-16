@@ -8,7 +8,8 @@ import { currentApiScope } from '@/lib/api/client'
 import { cn } from '@/lib/cn'
 import { AnswerText, BarChart, LookupChip, lookupLabel } from './parts'
 import { speak, useReadAloud, useSpeechInput } from './speech'
-import type { AssistantMessage } from './types'
+import { ProposalCard } from './ProposalCard'
+import type { AssistantMessage, ProposalOutcome } from './types'
 
 const SUGGESTIONS = ['How did tonight go?', 'What should we change?', 'Why did parties wait?']
 const MAX_LENGTH = 500
@@ -21,7 +22,7 @@ function textOf(message: AssistantMessage): string {
 export function AssistantPanel({ className }: { className?: string }) {
   const [input, setInput] = useState('')
   const threadRef = useRef<HTMLDivElement>(null)
-  const { messages, sendMessage, status, error, regenerate, clearError } = useChat<AssistantMessage>({
+  const { messages, sendMessage, status, error, regenerate, clearError, addToolOutput } = useChat<AssistantMessage>({
     transport: new DefaultChatTransport({
       // The scope (live outlet or a replay session) is read when each request is sent.
       prepareSendMessagesRequest: ({ messages }) => {
@@ -60,6 +61,14 @@ export function AssistantPanel({ className }: { className?: string }) {
     clearError()
     void sendMessage({ text: question, metadata: { spoken } })
     setInput('')
+  }
+
+  // After a confirmed or declined proposal, continue from it; regenerating would propose it again.
+  function retry() {
+    const last = messages.at(-1)
+    const settled = last?.role === 'assistant' && last.parts.some((p) => p.type === 'tool-propose_action' && p.state === 'output-available')
+    clearError()
+    void (settled ? sendMessage() : regenerate())
   }
 
   function submit(e: FormEvent) {
@@ -108,7 +117,12 @@ export function AssistantPanel({ className }: { className?: string }) {
               ) : null}
             </div>
           ) : (
-            <AssistantTurn key={m.id} message={m} done={!busy || m.id !== messages.at(-1)?.id} />
+            <AssistantTurn
+              key={m.id}
+              message={m}
+              done={!busy || m.id !== messages.at(-1)?.id}
+              onOutcome={(toolCallId, output) => void addToolOutput({ tool: 'propose_action', toolCallId, output })}
+            />
           ),
         )}
 
@@ -116,7 +130,7 @@ export function AssistantPanel({ className }: { className?: string }) {
         {error ? (
           <div className="rounded-lg border border-clearing/30 bg-clearing-tint px-3 py-2 text-[13px] text-clearing-deep">
             {error.message.includes('Gemini') ? error.message : 'The assistant could not answer. Gemini may be busy.'}{' '}
-            <button type="button" onClick={() => void regenerate()} className="inline-flex items-center gap-1 font-semibold underline">
+            <button type="button" onClick={retry} className="inline-flex items-center gap-1 font-semibold underline">
               <RotateCcw className="size-3.5" aria-hidden />
               Try again
             </button>
@@ -190,7 +204,15 @@ export function AssistantPanel({ className }: { className?: string }) {
   )
 }
 
-function AssistantTurn({ message, done }: { message: AssistantMessage; done: boolean }) {
+function AssistantTurn({
+  message,
+  done,
+  onOutcome,
+}: {
+  message: AssistantMessage
+  done: boolean
+  onOutcome: (toolCallId: string, outcome: ProposalOutcome) => void
+}) {
   const lookups = message.parts.flatMap((p) => {
     const label = lookupLabel(p)
     return label && isToolUIPart(p) ? [{ label, done: p.state === 'output-available', id: p.toolCallId }] : []
@@ -209,6 +231,16 @@ function AssistantTurn({ message, done }: { message: AssistantMessage; done: boo
       {message.parts.map((p, i) => {
         if (p.type === 'text') return <AnswerText key={i} text={p.text} />
         if (p.type === 'tool-show_chart' && p.state === 'output-available') return <BarChart key={i} chart={p.output} />
+        if (p.type === 'tool-propose_action' && (p.state === 'input-available' || p.state === 'output-available')) {
+          return (
+            <ProposalCard
+              key={p.toolCallId}
+              proposal={p.input}
+              outcome={p.state === 'output-available' ? p.output : undefined}
+              onOutcome={(outcome) => onOutcome(p.toolCallId, outcome)}
+            />
+          )
+        }
         return null
       })}
       {done && text ? (

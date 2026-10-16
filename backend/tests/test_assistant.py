@@ -59,6 +59,8 @@ def test_assistant_streams_text(client, model):
     out = chunks(r)
     types = [c["type"] for c in out]
     assert types[:3] == ["start", "start-step", "text-start"]
+    # The client owns message ids, so a continuation after a confirmed proposal stays one message.
+    assert "messageId" not in out[0]
     assert types[-3:] == ["text-end", "finish-step", "finish"]
     assert "".join(c["delta"] for c in out if c["type"] == "text-delta") == "T4 is slowest."
 

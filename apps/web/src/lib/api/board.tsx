@@ -103,8 +103,8 @@ export type ActionInput =
 export interface RunOptions {
   /** Toast text on success, e.g. "T4 claimed". Matches the button label's verb. */
   success: string
-  /** Called after the server confirms, e.g. to close a dialog. */
-  onSuccess?: () => void
+  /** Called after the server confirms, e.g. to close a dialog, with what the action returned. */
+  onSuccess?: (result: ActionResult) => void
   /** Return true when the caller handles the error itself (no toast), e.g. an override prompt. */
   onError?: (error: unknown) => boolean
 }
@@ -162,7 +162,7 @@ function pathOf(input: ActionInput): string {
   }
 }
 
-type ActionResult = TableBoardEntry | SeatingResult | QueueParty
+export type ActionResult = TableBoardEntry | SeatingResult | QueueParty
 
 /** The table entry an action returned, if any, so the cache can update before the next poll. */
 function entryOf(input: ActionInput, result: ActionResult): TableBoardEntry | null {
@@ -213,7 +213,7 @@ export function useActions() {
 
   const run = useCallback(
     (input: ActionInput, options: RunOptions) => {
-      mutation.mutate({ input, key: newIdempotencyKey(), options }, { onSuccess: () => options.onSuccess?.() })
+      mutation.mutate({ input, key: newIdempotencyKey(), options }, { onSuccess: (result) => options.onSuccess?.(result) })
     },
     [mutation],
   )

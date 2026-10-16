@@ -251,7 +251,9 @@ def chat_stream(ctx: Context, messages: list[dict], end: datetime) -> Iterator[s
 
     contents = _history(messages, types)
     declarations = [types.FunctionDeclaration(**t) for t in TOOLS]
-    yield _sse({"type": "start", "messageId": uuid.uuid4().hex})
+    # No messageId: the client keeps its own, so a continuation after a confirmed proposal
+    # extends the same assistant message instead of starting a copy.
+    yield _sse({"type": "start"})
     for step in range(MAX_TOOL_STEPS + 1):
         config = types.GenerateContentConfig(
             system_instruction=SYSTEM,
