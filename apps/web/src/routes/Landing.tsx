@@ -14,6 +14,9 @@ import { useIdentity } from '@/lib/identity/dev-identity'
 import { useMediaQuery, usePrefersReducedMotion } from '@/lib/use-media'
 import { DEMO_IDENTITY } from '@/config'
 
+/** The live demo is the recorded replay, running inside the host view. */
+const DEMO_HREF = '/host?source=replay'
+
 const StoryScene = lazy(() => import('@/features/landing/StoryScene'))
 
 const ROLES = [
@@ -98,7 +101,7 @@ export default function Landing() {
           For your team
         </a>
         <Link
-          href="/demo"
+          href={DEMO_HREF}
           className="rounded-[10px] bg-ink px-4 py-2.5 text-[15px] font-bold whitespace-nowrap text-white no-underline hover:bg-[#2a3a49]"
         >
           <span className="sm:hidden">Live demo</span>
@@ -239,7 +242,7 @@ function Hero({ visible, onStart }: { visible: boolean; onStart: () => void }) {
         </p>
         <div className="flex flex-wrap gap-3">
           <Link
-            href="/demo"
+            href={DEMO_HREF}
             tabIndex={visible ? undefined : -1}
             className="inline-flex h-12 items-center gap-2 rounded-[10px] bg-ink px-5 text-[16px] font-bold text-white no-underline hover:bg-[#2a3a49]"
           >

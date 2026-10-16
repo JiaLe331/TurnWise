@@ -9,6 +9,7 @@ import { FloorApp, type RouteRole } from '@/routes/FloorApp'
 import { NotFound } from '@/routes/NotFound'
 
 const Landing = lazy(() => import('@/routes/Landing'))
+/** Archived: the original standalone live demo, superseded by the replay source in the main views. */
 const LiveDemo = lazy(() => import('@/routes/LiveDemo'))
 
 export default function App() {
@@ -19,7 +20,11 @@ export default function App() {
           <Landing />
         </Suspense>
       </Route>
+      {/* The replay now runs inside the main views; the original demo page is kept at /demo/classic. */}
       <Route path="/demo">
+        <Redirect to="/host?source=replay" replace />
+      </Route>
+      <Route path="/demo/classic">
         <Suspense fallback={null}>
           <LiveDemo />
         </Suspense>
