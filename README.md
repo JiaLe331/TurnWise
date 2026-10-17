@@ -72,7 +72,7 @@ The next implementation stage is the PRD's manual workflow: authentication and o
 
 ## Demo deployment
 
-See [deploy/README.md](deploy/README.md): one AWS server running the API (Firestore persistence, `TURNWISE_STORAGE=firestore`) and the web app behind Caddy, with no sign-in (the build sets `VITE_DEMO_IDENTITY=true` so the persona switcher works in production).
+See [deploy/README.md](deploy/README.md): two Google Cloud Run services, the API (Firestore persistence, `TURNWISE_STORAGE=firestore`) and the web app behind Caddy, with no sign-in (the build sets `VITE_DEMO_IDENTITY=true` so the persona switcher works in production).
 
 ## Live demo (recorded replay)
 

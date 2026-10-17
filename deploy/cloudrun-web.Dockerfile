@@ -1,4 +1,4 @@
-# Cloud Run variant of web.Dockerfile: Caddy listens on $PORT and proxies /api to API_URL.
+# Web app image for Cloud Run: Caddy serves the build, listens on $PORT and proxies /api to API_URL.
 FROM node:24-slim AS build
 WORKDIR /src
 RUN corepack enable
