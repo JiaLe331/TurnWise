@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { useBoard } from '@/lib/api/board'
 import { ApiError, apiScopeKey } from '@/lib/api/client'
 import type { QueueParty, Recommendation, SeatingHold, TableOption } from '@/lib/api/types'
-import { formatMinutes, minutesSince } from '@/lib/domain/time'
+import { formatSeconds, secondsSince } from '@/lib/domain/time'
 import { useIdentity } from '@/lib/identity/dev-identity'
 import { outletApi } from './api'
 
@@ -91,7 +91,7 @@ export function HostPanel({ onSelect }: { onSelect: (id: string) => void }) {
                   {p.requirements.length ? <span className="ml-1 text-[13px] text-pewter">· {p.requirements.join(', ')}</span> : null}
                 </span>
                 <span className="flex items-center gap-1 text-[13px] text-pewter">
-                  {p.status === 'on_hold' ? 'on hold' : <><Clock3 className="size-3.5" aria-hidden />{formatMinutes(minutesSince(p.arrival_at, serverNow))}</>}
+                  {p.status === 'on_hold' ? 'on hold' : <><Clock3 className="size-3.5" aria-hidden />{formatSeconds(secondsSince(p.arrival_at, serverNow))}</>}
                 </span>
               </li>
             ))}

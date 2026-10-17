@@ -1,7 +1,7 @@
-import { UNCLAIMED_ALERT_MIN } from '@/config'
+import { UNCLAIMED_ALERT_S } from '@/config'
 import type { TableBoardEntry } from '@/lib/api/types'
 import { openTask } from './status'
-import { minutesSince } from './time'
+import { secondsSince } from './time'
 
 export type ExceptionKind = 'review' | 'unclaimed' | 'manual' | 'blocked'
 
@@ -19,8 +19,8 @@ export function findExceptions(entries: TableBoardEntry[], serverNow: number): T
     if (entry.session.operational_state === 'departure_review') {
       found.push({ kind: 'review', entry, label: 'Departure check pending' })
     }
-    if (task?.status === 'unassigned' && minutesSince(task.created_at, serverNow) >= UNCLAIMED_ALERT_MIN) {
-      found.push({ kind: 'unclaimed', entry, label: `Unclaimed for ${UNCLAIMED_ALERT_MIN}+ min` })
+    if (task?.status === 'unassigned' && secondsSince(task.created_at, serverNow) >= UNCLAIMED_ALERT_S) {
+      found.push({ kind: 'unclaimed', entry, label: `Unclaimed for ${UNCLAIMED_ALERT_S}+ s` })
     }
     if (entry.session.manual) found.push({ kind: 'manual', entry, label: 'Manual override active' })
     if (entry.table.blocked) found.push({ kind: 'blocked', entry, label: 'Blocked' })

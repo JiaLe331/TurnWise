@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import type { TableBoardEntry } from '@/lib/api/types'
 import { cn } from '@/lib/cn'
 import { STATE } from '@/lib/domain/status'
-import { formatAgo, minutesSince } from '@/lib/domain/time'
+import { formatAgo, secondsSince } from '@/lib/domain/time'
 
 interface StaffStep {
   title: string
@@ -93,7 +93,7 @@ export function EvidenceChain({ entry, serverNow }: { entry: TableBoardEntry; se
             detail={
               ev.review_source === 'observation'
                 ? 'No seated guests for 30 s, so the camera asked staff to check'
-                : `Seen ${formatAgo(minutesSince(ev.last_observed_at, serverNow))}${ev.object_flags.length ? ` · ${ev.object_flags.join(', ')}` : ''}`
+                : `Seen ${formatAgo(secondsSince(ev.last_observed_at, serverNow))}${ev.object_flags.length ? ` · ${ev.object_flags.join(', ')}` : ''}`
             }
           />
         ) : (
@@ -119,7 +119,7 @@ export function EvidenceChain({ entry, serverNow }: { entry: TableBoardEntry; se
             icon={<UserCheck />}
             title={step.title}
             badge="Staff"
-            detail={step.at ? formatAgo(minutesSince(step.at, serverNow)) : 'Waiting for someone to check the table'}
+            detail={step.at ? formatAgo(secondsSince(step.at, serverNow)) : 'Waiting for someone to check the table'}
           />
         ) : null}
         <Node

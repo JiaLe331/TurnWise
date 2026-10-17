@@ -21,8 +21,8 @@ const COUNT_LABEL: [string, string][] = [
   ['ready_table_leftovers_seen', 'Gemini leftover alerts'],
 ]
 
-function minutes(seconds: number | null) {
-  return seconds == null ? '—' : `${(seconds / 60).toFixed(1)} min`
+function seconds(value: number | null) {
+  return value == null ? '—' : `${Math.round(value)} s`
 }
 
 function AiCard({ title, icon, children, model }: { title: string; icon: ReactNode; children: ReactNode; model?: string }) {
@@ -97,7 +97,7 @@ export function ManagerPanel() {
             <div key={d.metric} className="contents">
               <dt className="text-pewter">{METRIC_LABEL[d.metric] ?? d.metric}</dt>
               <dd className="m-0 text-right font-semibold">
-                {minutes(d.median_s)} <span className="font-normal text-pewter">n={d.count}</span>
+                {seconds(d.median_s)} <span className="font-normal text-pewter">n={d.count}</span>
               </dd>
             </div>
           ))}

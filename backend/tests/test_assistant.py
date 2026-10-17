@@ -171,7 +171,7 @@ def test_floor_now_lists_per_table_timings(services, clock):
     floor = assistant.run_tool(services.ctx, "get_floor_now", {}, clock.now())
     by_id = {t["table"]: t for t in floor["tables"]}
     occupied = [t for t in floor["tables"] if t["state"] == "occupied"]
-    assert occupied and all(t["seated_min"] is not None for t in occupied)
+    assert occupied and all(t["seated_s"] is not None for t in occupied)
     assert by_id["T1"]["seats"] >= 1
 
 

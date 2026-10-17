@@ -6,7 +6,7 @@ import { Dropdown, DropdownContent, DropdownItem, DropdownTrigger } from '@/comp
 import { useBoard } from '@/lib/api/board'
 import type { PartyAction, QueueParty, SeatingHold } from '@/lib/api/types'
 import { cn } from '@/lib/cn'
-import { formatMinutes, minutesSince } from '@/lib/domain/time'
+import { formatSeconds, secondsSince } from '@/lib/domain/time'
 import { HoldControls } from './HoldControls'
 import { useSeating } from './useSeating'
 
@@ -56,7 +56,7 @@ export function PartyRow({
             {hold ? null : (
               <span className="tabular flex items-center gap-1 text-[13px] font-semibold text-pewter" title="Waiting time">
                 <Clock3 className="size-3.5" aria-hidden />
-                {formatMinutes(minutesSince(party.arrival_at, serverNow))}
+                {formatSeconds(secondsSince(party.arrival_at, serverNow))}
               </span>
             )}
           </button>

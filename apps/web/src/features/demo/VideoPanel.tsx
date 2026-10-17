@@ -146,7 +146,7 @@ export function VideoPanel(props: VideoPanelProps) {
   }
 
   const duration = timeline.duration_s
-  const simMinutes = (now * props.timeScale) / 60
+  const simSeconds = now * props.timeScale
   return (
     <section aria-label="Camera 02 replay" className="relative overflow-hidden rounded-[14px] bg-black">
       <video
@@ -206,7 +206,7 @@ export function VideoPanel(props: VideoPanelProps) {
           <div className="h-full bg-white" style={{ width: `${(now / duration) * 100}%` }} />
         </div>
         <span className="rounded-md bg-black/70 px-2 py-1 font-mono text-[12px] text-white">
-          {mmss(now)} / {mmss(duration)} · shift +{simMinutes.toFixed(1)} min
+          {mmss(now)} / {mmss(duration)} · shift +{Math.round(simSeconds)} s
         </span>
       </div>
       <p className="sr-only">Table zones show what the camera sees. Gemini notes appear on vacant tables.</p>

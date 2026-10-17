@@ -8,21 +8,18 @@ export function serverOffsetMs(generatedAt: string, receivedAt: number): number 
   return Date.parse(generatedAt) - receivedAt
 }
 
-export function minutesSince(iso: string, serverNow: number): number {
-  return Math.max(0, Math.floor((serverNow - Date.parse(iso)) / 60_000))
+export function secondsSince(iso: string, serverNow: number): number {
+  return Math.max(0, Math.floor((serverNow - Date.parse(iso)) / 1000))
 }
 
-export function formatMinutes(minutes: number): string {
-  if (minutes < 1) return '<1 min'
-  if (minutes < 60) return `${minutes} min`
-  const hours = Math.floor(minutes / 60)
-  const rest = minutes % 60
-  return rest ? `${hours} h ${rest} min` : `${hours} h`
+/** Every duration in the UI is whole seconds, so numbers compare at a glance. */
+export function formatSeconds(seconds: number): string {
+  return `${Math.round(seconds)} s`
 }
 
-/** "6 min ago", or "just now" under a minute. */
-export function formatAgo(minutes: number): string {
-  return minutes < 1 ? 'just now' : `${formatMinutes(minutes)} ago`
+/** "45 s ago", or "just now" under a second. */
+export function formatAgo(seconds: number): string {
+  return seconds < 1 ? 'just now' : `${formatSeconds(seconds)} ago`
 }
 
 export function formatClock(epochMs: number): string {

@@ -32,7 +32,7 @@ SYSTEM = (
     "You are the shift assistant for a casual-dining restaurant manager, often spoken to on the "
     "floor. Answer in 2 to 4 short sentences that read well aloud. Get every number from a tool; "
     "never invent tables, parties, times or causes, and say plainly when data is thin. Durations "
-    "are minutes. When comparing three or more numbers, also call show_chart. Call propose_action "
+    "are seconds; quote them in seconds. When comparing three or more numbers, also call show_chart. Call propose_action "
     "only when an action would clearly help and is one its schema allows; the manager must "
     "confirm it, so describe it, don't claim it is done. Camera and Gemini evidence is advisory: "
     "staff confirm every departure and ready state."
@@ -42,7 +42,7 @@ _OBJ = {"type": "object", "properties": {}}
 TOOLS = [
     {
         "name": "get_shift_metrics",
-        "description": "Shift timing metrics (median and p90 minutes for departure-to-ready, "
+        "description": "Shift timing metrics (median and p90 seconds for departure-to-ready, "
         "review-to-confirmation, ready-to-seated, queue wait), event counts and the camera "
         "review correction rate.",
         "parameters_json_schema": {
@@ -128,7 +128,7 @@ _FLOOR_KEYS = (
     "gemini_table_checks",
 )
 _METRIC_KEYS = (
-    "metrics_minutes",
+    "metrics_seconds",
     "event_counts",
     "vision_review_correction_rate",
     "measurement_notes",
@@ -206,10 +206,10 @@ def run_tool(ctx: Context, name: str, args: dict, end: datetime) -> dict:
 
 
 def _table_timings(ctx: Context, now: datetime) -> list[dict]:
-    """Per table: state and minutes since it was seated, vacated or made ready."""
+    """Per table: state and seconds since it was seated, vacated or made ready."""
 
     def ago(at: datetime | None) -> float | None:
-        return None if at is None else round((now - at).total_seconds() / 60, 1)
+        return None if at is None else round((now - at).total_seconds())
 
     return [
         {
@@ -217,9 +217,9 @@ def _table_timings(ctx: Context, now: datetime) -> list[dict]:
             "seats": e.table.capacity,
             "zone": e.table.zone,
             "state": e.session.operational_state.value,
-            "seated_min": ago(e.session.seated_at),
-            "departed_min": ago(e.session.departed_at),
-            "ready_min": ago(e.session.ready_at),
+            "seated_s": ago(e.session.seated_at),
+            "departed_s": ago(e.session.departed_at),
+            "ready_s": ago(e.session.ready_at),
         }
         for e in build_board(ctx).tables
     ]

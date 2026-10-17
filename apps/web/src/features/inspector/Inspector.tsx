@@ -7,7 +7,7 @@ import { SeatHere } from '@/features/waitlist/SeatHere'
 import { StateChip } from '@/features/table/StateChip'
 import { nextSteps } from '@/lib/domain/next-step'
 import { elapsedAnchor, openTask } from '@/lib/domain/status'
-import { formatAgo, formatMinutes, minutesSince } from '@/lib/domain/time'
+import { formatAgo, formatSeconds, secondsSince } from '@/lib/domain/time'
 import { useIdentity } from '@/lib/identity/dev-identity'
 import { StepButton } from './StepButtons'
 
@@ -67,7 +67,7 @@ export function Inspector({ entry, onClose }: { entry: TableBoardEntry; onClose?
         {anchor ? (
           <p className="mt-2.5 mb-0 flex items-center gap-1.5 text-[14px] font-medium text-pewter">
             <Clock3 className="size-4" aria-hidden />
-            <span className="tabular">{formatMinutes(minutesSince(anchor.at, serverNow))}</span> {anchor.phrase}
+            <span className="tabular">{formatSeconds(secondsSince(anchor.at, serverNow))}</span> {anchor.phrase}
           </p>
         ) : null}
         <p className="mt-1.5 mb-0 flex flex-wrap gap-x-3.5 gap-y-1 text-[14px] font-medium text-pewter">
@@ -106,7 +106,7 @@ export function Inspector({ entry, onClose }: { entry: TableBoardEntry; onClose?
             {task.owner_id ? <span className="font-medium text-pewter"> by {task.owner_id}</span> : null}
           </p>
           <p className="mt-1 mb-3.5 text-[13.5px] font-medium text-pewter">
-            {task.priority_reason}. Created {formatAgo(minutesSince(task.created_at, serverNow))}.
+            {task.priority_reason}. Created {formatAgo(secondsSince(task.created_at, serverNow))}.
           </p>
           <ActionArea steps={steps} />
         </section>

@@ -11,7 +11,7 @@ import {
   STATE,
   STATE_ORDER,
 } from '@/lib/domain/status'
-import { formatMinutes, minutesSince } from '@/lib/domain/time'
+import { formatSeconds, secondsSince } from '@/lib/domain/time'
 import { holdsByTable, secondsLeft } from '@/lib/api/seating'
 import type { Lens } from '@/features/lenses/lens'
 
@@ -65,7 +65,7 @@ function sortWithinGroup(serverNow: number) {
   return (a: TableBoardEntry, b: TableBoardEntry) => {
     const am = elapsedAnchor(a)
     const bm = elapsedAnchor(b)
-    return (bm ? minutesSince(bm.at, serverNow) : -1) - (am ? minutesSince(am.at, serverNow) : -1)
+    return (bm ? secondsSince(bm.at, serverNow) : -1) - (am ? secondsSince(am.at, serverNow) : -1)
   }
 }
 
@@ -220,7 +220,7 @@ function LedgerRow({ entry, serverNow, selected, order, note, onSelect }: RowPro
         <span className="block truncate text-[12.5px] font-medium text-pewter">{sub}</span>
       </span>
       <span className="tabular shrink-0 text-[13px] font-semibold text-pewter">
-        {anchor ? formatMinutes(minutesSince(anchor.at, serverNow)) : ''}
+        {anchor ? formatSeconds(secondsSince(anchor.at, serverNow)) : ''}
       </span>
     </button>
   )

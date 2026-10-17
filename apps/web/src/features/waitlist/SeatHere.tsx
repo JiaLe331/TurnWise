@@ -2,7 +2,7 @@ import { Armchair } from 'lucide-react'
 import { useBoard } from '@/lib/api/board'
 import { holdsByTable, unsuitable, waitlistOf } from '@/lib/api/seating'
 import type { TableBoardEntry } from '@/lib/api/types'
-import { formatMinutes, minutesSince } from '@/lib/domain/time'
+import { formatSeconds, secondsSince } from '@/lib/domain/time'
 import { HoldControls } from './HoldControls'
 import { SeatOption } from './SeatOption'
 import { useSeating } from './useSeating'
@@ -58,7 +58,7 @@ export function SeatHere({ entry }: { entry: TableBoardEntry }) {
                   <span className="font-semibold">Party of {party.size}</span>
                 </>
               }
-              detail={`Waiting ${formatMinutes(minutesSince(party.arrival_at, serverNow))}${
+              detail={`Waiting ${formatSeconds(secondsSince(party.arrival_at, serverNow))}${
                 party.requirements.length ? `. Needs ${party.requirements.join(', ')}` : ''
               }`}
             />

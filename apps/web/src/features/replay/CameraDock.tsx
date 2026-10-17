@@ -63,7 +63,7 @@ function Caption({ narration, media, below }: { narration: Narration[]; media: n
 function Transport() {
   const replay = useReplay()
   const duration = replay.session?.duration_s ?? 0
-  const shiftMin = (replay.mediaNow * (replay.session?.time_scale ?? 1)) / 60
+  const shiftS = replay.mediaNow * (replay.session?.time_scale ?? 1)
   return (
     <div className="flex h-10 shrink-0 items-center gap-1.5 border-b border-rule px-2">
       <button
@@ -102,7 +102,7 @@ function Transport() {
       <div className="mx-1 h-1 min-w-6 flex-1 overflow-hidden rounded-full bg-rule" aria-hidden>
         <div className="h-full bg-ink" style={{ width: `${duration ? Math.min(100, (replay.mediaNow / duration) * 100) : 0}%` }} />
       </div>
-      <span className="tabular shrink-0 text-[12px] text-pewter" title={`Shift clock +${shiftMin.toFixed(1)} min`}>
+      <span className="tabular shrink-0 text-[12px] text-pewter" title={`Shift clock +${Math.round(shiftS)} s`}>
         {clock(replay.mediaNow)} / {clock(duration)}
       </span>
     </div>

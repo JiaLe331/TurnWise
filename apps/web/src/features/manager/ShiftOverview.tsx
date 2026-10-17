@@ -8,6 +8,7 @@ import { apiScopeKey } from '@/lib/api/client'
 import { shiftApi } from '@/lib/api/shift'
 import type { MetricSummary, ShiftBriefing, ShiftInsights } from '@/lib/api/types'
 import { cn } from '@/lib/cn'
+import { formatSeconds } from '@/lib/domain/time'
 
 const DURATIONS: { metric: string; label: string; help: string }[] = [
   { metric: 'confirmed_departure_to_ready', label: 'Departure to ready', help: 'From staff confirming a departure to the table marked ready' },
@@ -26,9 +27,8 @@ const COUNTS: [string, string][] = [
   ['ready_table_leftovers_seen', 'Gemini leftover alerts'],
 ]
 
-function mins(seconds: number | null | undefined): string {
-  if (seconds == null) return 'No data yet'
-  return seconds < 60 ? `${Math.round(seconds)} s` : `${(seconds / 60).toFixed(1)} min`
+function secs(seconds: number | null | undefined): string {
+  return seconds == null ? 'No data yet' : formatSeconds(seconds)
 }
 
 function errorText(error: unknown): string {
@@ -74,9 +74,9 @@ function DurationRow({ label, help, summary }: { label: string; help: string; su
     <li className="flex items-baseline justify-between gap-3 py-2" title={help}>
       <span className="text-[13.5px] font-semibold">{label}</span>
       <span className="text-right">
-        <span className="tabular block text-[17px] font-bold">{mins(summary?.median_s)}</span>
+        <span className="tabular block text-[17px] font-bold">{secs(summary?.median_s)}</span>
         <span className="tabular block text-[12px] text-pewter">
-          {summary && summary.count > 0 ? `median, P90 ${mins(summary.p90_s)}, ${summary.count} measured` : 'median'}
+          {summary && summary.count > 0 ? `median, P90 ${secs(summary.p90_s)}, ${summary.count} measured` : 'median'}
         </span>
       </span>
     </li>
@@ -144,7 +144,7 @@ export function ShiftOverview({ className }: { className?: string }) {
             {bySize.map(([size, s], i) => (
               <span key={size} className="tabular">
                 {i ? ', ' : ''}
-                {size} guests {mins(s.median_s)}
+                {size} guests {secs(s.median_s)}
               </span>
             ))}
           </p>

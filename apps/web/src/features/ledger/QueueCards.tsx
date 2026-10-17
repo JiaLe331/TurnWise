@@ -6,7 +6,7 @@ import type { TableBoardEntry } from '@/lib/api/types'
 import { cn } from '@/lib/cn'
 import { nextSteps } from '@/lib/domain/next-step'
 import { elapsedAnchor, openTask, STATE } from '@/lib/domain/status'
-import { formatMinutes, minutesSince } from '@/lib/domain/time'
+import { formatSeconds, secondsSince } from '@/lib/domain/time'
 import { useIdentity } from '@/lib/identity/dev-identity'
 
 interface QueueCardsProps {
@@ -156,7 +156,7 @@ function QueueCard({ entry, order, serverNow, selected, onSelect, actorId, descr
           <span className="rounded-md bg-cleaning-tint px-1.5 py-0.5 text-[11.5px] font-bold text-cleaning-deep">You</span>
         ) : null}
         <span className="tabular ml-auto text-[14px] font-semibold text-pewter">
-          {anchor ? formatMinutes(minutesSince(anchor.at, serverNow)) : ''}
+          {anchor ? formatSeconds(secondsSince(anchor.at, serverNow)) : ''}
         </span>
       </button>
       <p className="mt-1.5 mb-3 text-[13.5px] leading-snug text-pewter">{sub}</p>

@@ -6,8 +6,8 @@ import { useBoard } from '@/lib/api/board'
 import { waitlistOf } from '@/lib/api/seating'
 import { cn } from '@/lib/cn'
 
-function minutes(seconds: number | null | undefined): string {
-  return seconds == null ? '–' : (seconds / 60).toFixed(1)
+function seconds(value: number | null | undefined): string {
+  return value == null ? '–' : String(Math.round(value))
 }
 
 /** The manager's live shift numbers above the floor, with the full shift report a click away. */
@@ -18,9 +18,9 @@ export function InsightsStrip({ className }: { className?: string }) {
   const median = (metric: string) => metrics.data?.durations.find((d) => d.metric === metric)?.median_s
   const waiting = waitlistOf(board).filter((p) => p.status === 'waiting').length
   const items: [string, string, string][] = [
-    ['Queue wait', minutes(median('queue_wait')), 'min'],
-    ['Clear to ready', minutes(median('confirmed_departure_to_ready')), 'min'],
-    ['Ready to seat', minutes(median('ready_to_seated')), 'min'],
+    ['Queue wait', seconds(median('queue_wait')), 's'],
+    ['Clear to ready', seconds(median('confirmed_departure_to_ready')), 's'],
+    ['Ready to seat', seconds(median('ready_to_seated')), 's'],
     ['Waiting now', String(waiting), waiting === 1 ? 'party' : 'parties'],
   ]
 

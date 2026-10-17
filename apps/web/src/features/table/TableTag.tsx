@@ -3,7 +3,7 @@ import type { CSSProperties, Ref } from 'react'
 import type { TableBoardEntry } from '@/lib/api/types'
 import { cn } from '@/lib/cn'
 import { elapsedAnchor, STATE } from '@/lib/domain/status'
-import { minutesSince } from '@/lib/domain/time'
+import { formatSeconds, secondsSince } from '@/lib/domain/time'
 import { initialsFor } from '@/lib/identity/personas'
 
 interface TableTagProps {
@@ -44,7 +44,7 @@ export function TableTag({
   const s = STATE[session.operational_state]
   const Icon = s.icon
   const anchor = elapsedAnchor(entry)
-  const minutes = anchor ? minutesSince(anchor.at, serverNow) : null
+  const seconds = anchor ? secondsSince(anchor.at, serverNow) : null
   const owner = task && (task.status === 'claimed' || task.status === 'started') ? task.owner_id : null
   const bar = dimmed ? '#aeb6b2' : table.blocked ? 'var(--color-blocked)' : s.solid
 
@@ -80,8 +80,8 @@ export function TableTag({
         <Icon className="size-[15px]" style={{ color: dimmed ? '#8a949b' : s.solid }} aria-hidden />
       )}
       {session.manual ? <Hand className="size-[14px] text-ink" aria-label="Manual override" /> : null}
-      {!compact && minutes !== null ? (
-        <span className="tabular font-medium text-pewter">{minutes < 1 ? 'now' : `${minutes}m`}</span>
+      {!compact && seconds !== null ? (
+        <span className="tabular font-medium text-pewter">{seconds < 1 ? 'now' : formatSeconds(seconds)}</span>
       ) : null}
       {!compact && owner ? (
         <span className="rounded-[5px] bg-cleaning-tint px-1 text-[10.5px] text-cleaning-deep">

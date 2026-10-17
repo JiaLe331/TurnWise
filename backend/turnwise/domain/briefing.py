@@ -26,7 +26,7 @@ CACHE_S = 120
 PROMPT = (
     "You are the shift assistant for a casual-dining restaurant manager. Using ONLY the JSON facts "
     "below, write a short headline, up to 5 highlights and up to 3 concrete suggestions for the "
-    "rest of the shift. Quote numbers exactly as given (durations are minutes). If the data is "
+    "rest of the shift. Quote numbers exactly as given (durations are seconds; quote them in seconds). If the data is "
     "sparse or a metric has no samples, say so plainly. Never invent tables, parties, times or "
     "causes; camera evidence is advisory and staff confirm every departure and ready state."
 )
@@ -87,7 +87,7 @@ class ShiftInsights(BaseModel):
 
 ASK_PROMPT = (
     "You answer a restaurant manager's question about the current shift using ONLY the JSON "
-    "facts that follow the question. Durations are minutes. If the facts cannot answer it, set "
+    "facts that follow the question. Durations are seconds; quote them in seconds. If the facts cannot answer it, set "
     "answerable=false and say what data is missing. Name the specific facts you used. Never "
     "invent numbers, tables or causes. Keep the answer under 80 words."
 )
@@ -112,8 +112,8 @@ class AiUnavailable(DomainError):
         )
 
 
-def _minutes(seconds: float | None) -> float | None:
-    return None if seconds is None else round(seconds / 60, 1)
+def _seconds(value: float | None) -> int | None:
+    return None if value is None else round(value)
 
 
 def briefing_facts(ctx: Context, start: datetime, end: datetime) -> dict:
@@ -130,7 +130,7 @@ def briefing_facts(ctx: Context, start: datetime, end: datetime) -> dict:
             {
                 "code": p.queue_code,
                 "size": p.size,
-                "waiting_min": round((now - p.arrival_at).total_seconds() / 60, 1),
+                "waiting_s": round((now - p.arrival_at).total_seconds()),
                 "needs": p.requirements,
             }
             for p in waiting
@@ -158,8 +158,8 @@ def briefing_facts(ctx: Context, start: datetime, end: datetime) -> dict:
             for e in board.tables
             if e.evidence and e.evidence.table_check
         },
-        "metrics_minutes": {
-            d.metric: {"samples": d.count, "median": _minutes(d.median_s), "p90": _minutes(d.p90_s)}
+        "metrics_seconds": {
+            d.metric: {"samples": d.count, "median": _seconds(d.median_s), "p90": _seconds(d.p90_s)}
             for d in metrics.durations
         },
         "event_counts": metrics.counts,
@@ -167,7 +167,7 @@ def briefing_facts(ctx: Context, start: datetime, end: datetime) -> dict:
         "measurement_notes": metrics.notes,
         "recent_events": [
             {
-                "minutes_ago": round((now - e.event_time).total_seconds() / 60, 1),
+                "seconds_ago": round((now - e.event_time).total_seconds()),
                 "type": e.event_type,
                 "table": e.table_id,
                 "actor": e.actor_type,

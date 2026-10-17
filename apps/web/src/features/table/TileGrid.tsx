@@ -3,7 +3,7 @@ import { useBoard } from '@/lib/api/board'
 import type { TableBoardEntry } from '@/lib/api/types'
 import { cn } from '@/lib/cn'
 import { elapsedAnchor, STATE } from '@/lib/domain/status'
-import { formatMinutes, minutesSince } from '@/lib/domain/time'
+import { formatSeconds, secondsSince } from '@/lib/domain/time'
 
 interface TileGridProps {
   selectedId: string | null
@@ -66,7 +66,7 @@ export function TileGrid({ selectedId, onSelect, isDimmed, order, className }: T
                       {session.manual ? <Hand className="size-3.5" aria-label="Manual override" /> : null}
                     </span>
                     <span className="tabular text-[12.5px] font-medium text-pewter">
-                      {anchor ? `${formatMinutes(minutesSince(anchor.at, serverNow))} ${anchor.phrase}` : ' '}
+                      {anchor ? `${formatSeconds(secondsSince(anchor.at, serverNow))} ${anchor.phrase}` : ' '}
                     </span>
                   </button>
                 )

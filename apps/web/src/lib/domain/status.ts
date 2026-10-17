@@ -85,7 +85,7 @@ export function isAvailable(entry: TableBoardEntry): boolean {
 
 export interface ElapsedAnchor {
   at: string
-  /** How the elapsed time reads, e.g. "6 min since departure". */
+  /** How the elapsed time reads, e.g. "360 s since departure". */
   phrase: string
 }
 

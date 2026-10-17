@@ -113,7 +113,7 @@ def availability(
 def _option(table: Table, session: TableSession, party: QueueParty, kind: str, now) -> TableOption:
     ready = ""
     if session.ready_at is not None:
-        ready = f"ready {int((now - session.ready_at).total_seconds() // 60)} min, "
+        ready = f"ready {int((now - session.ready_at).total_seconds())} s, "
     proof = "camera clear" if kind == "camera" else "staff-confirmed, no camera"
     return TableOption(
         table_id=table.table_id,
