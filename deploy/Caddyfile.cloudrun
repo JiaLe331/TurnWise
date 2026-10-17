@@ -1,0 +1,20 @@
+# Cloud Run web service: static app plus /api proxied (prefix stripped) to the API's Cloud Run URL.
+# API_URL, e.g. https://turnwise-api-<number>.asia-southeast1.run.app, is set on the service.
+{
+	auto_https off
+	admin off
+}
+:{$PORT:8080} {
+	encode zstd gzip
+	handle_path /api/* {
+		reverse_proxy {$API_URL} {
+			header_up Host {upstream_hostport}
+			flush_interval -1
+		}
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

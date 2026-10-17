@@ -1,0 +1,11 @@
+# Upload only what the Cloud Build web image needs. The demo video is gitignored but must be included.
+.git
+.env
+.env.*
+!.env.example
+node_modules
+.venv
+dist
+.firebase
+backend
+docs
