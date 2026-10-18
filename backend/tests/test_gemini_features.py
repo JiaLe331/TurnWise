@@ -246,7 +246,7 @@ def test_exhausted_quota_moves_to_the_next_model_without_retrying(monkeypatch):
 
     monkeypatch.setenv("GEMINI_API_KEY", "test")
     monkeypatch.setenv("TURNWISE_GEMINI_MODELS", "spent,fresh")
-    monkeypatch.setattr(gemini, "_get_client", lambda: type("C", (), {"models": Models()})())
+    monkeypatch.setattr(gemini, "_get_client", lambda key: type("C", (), {"models": Models()})())
     monkeypatch.setattr(gemini.time, "sleep", lambda s: None)
     assert gemini.generate([], Out) == (Out(ok=True), "fresh")
     assert tried == ["spent", "fresh"]
@@ -256,3 +256,40 @@ def test_default_models_skip_retired_ones():
     from turnwise import gemini
 
     assert "gemini-2.5-flash-lite" not in gemini.DEFAULT_MODELS
+
+
+def test_paid_key_is_tried_on_every_model_before_the_next_key(monkeypatch):
+    from pydantic import BaseModel
+
+    from turnwise import gemini
+
+    class Out(BaseModel):
+        ok: bool
+
+    tried = []
+
+    def client(key):
+        class Models:
+            def generate_content(self, model, contents, config):
+                tried.append((model, key))
+                if key == "paid" and model == "pinned":
+                    raise RuntimeError("404 NOT_FOUND. no longer available to new users")
+                if key == "paid":
+                    raise RuntimeError("429 RESOURCE_EXHAUSTED. You exceeded your current quota")
+                return type("R", (), {"parsed": Out(ok=True)})()
+
+        return type("C", (), {"models": Models()})()
+
+    monkeypatch.setenv("GEMINI_API_KEY", "first")
+    monkeypatch.setenv("GEMINI_API_KEY_2", "paid")
+    monkeypatch.setenv("GEMINI_API_KEY_3", "spare")
+    monkeypatch.setenv("TURNWISE_GEMINI_MODELS", "pinned,other")
+    monkeypatch.setattr(gemini, "_get_client", client)
+    monkeypatch.setattr(gemini.time, "sleep", lambda s: None)
+    assert gemini.keys() == ["paid", "spare", "first"]
+    assert gemini.generate([], Out) == (Out(ok=True), "pinned")
+    assert tried == [("pinned", "paid"), ("other", "paid"), ("pinned", "spare")]
+    tried.clear()
+    gemini.generate([], Out)
+    assert tried[0] == ("other", "paid")  # the retired model isn't asked again
+    gemini._retired.clear()

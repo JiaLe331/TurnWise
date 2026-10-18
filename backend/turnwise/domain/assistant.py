@@ -224,9 +224,9 @@ def _table_timings(ctx: Context, now: datetime) -> list[dict]:
     ]
 
 
-def _stream_model(model: str, contents: list, config) -> Iterator[tuple]:
+def _stream_model(model: str, key: str, contents: list, config) -> Iterator[tuple]:
     """Yields ("text", str) and ("call", name, args, part) from one streamed Gemini call."""
-    client = gemini._get_client()
+    client = gemini._get_client(key)
     for chunk in client.models.generate_content_stream(
         model=model, contents=contents, config=config
     ):
@@ -269,9 +269,9 @@ def chat_stream(ctx: Context, messages: list[dict], end: datetime) -> Iterator[s
         )
         yield _sse({"type": "start-step"})
         text_id, text, calls, failed = None, "", [], True
-        for model in gemini.models():
+        for model, key in gemini.candidates():
             try:
-                for event in _stream_model(model, contents, config):
+                for event in _stream_model(model, key, contents, config):
                     if event[0] == "text":
                         if text_id is None:
                             text_id = uuid.uuid4().hex
@@ -283,7 +283,10 @@ def chat_stream(ctx: Context, messages: list[dict], end: datetime) -> Iterator[s
                 failed = False
                 break
             except Exception as err:  # noqa: BLE001 - any provider failure falls through
-                log.warning("assistant %s failed: %s", model, str(err)[:160])
+                gemini.give_up_on(model, key, err)
+                log.warning(
+                    "assistant %s %s failed: %s", model, gemini.key_label(key), str(err)[:160]
+                )
                 if text_id is not None or calls:
                     break  # output already started; don't replay it from another model
         if failed:

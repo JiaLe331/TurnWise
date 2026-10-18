@@ -25,7 +25,7 @@ def model(monkeypatch):
         steps: ClassVar[list] = []
         calls: ClassVar[list] = []
 
-    def fake(model_name, contents, config):
+    def fake(model_name, key, contents, config):
         Script.calls.append((model_name, contents, config))
         step = Script.steps.pop(0) if len(Script.steps) > 1 else Script.steps[0]
         if isinstance(step, Exception):

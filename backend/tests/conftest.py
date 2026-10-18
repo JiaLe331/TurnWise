@@ -3,7 +3,8 @@ import os
 # Tests never touch real Firestore: these win over the repository .env (loaded with setdefault).
 os.environ["TURNWISE_STORAGE"] = "memory"
 os.environ["FIREBASE_SERVICE_ACCOUNT_JSON"] = ""
-os.environ["GEMINI_API_KEY"] = ""  # no real Gemini calls from tests
+for _key in ("GEMINI_API_KEY", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3"):
+    os.environ[_key] = ""  # no real Gemini calls from tests
 
 from datetime import UTC, datetime
 
