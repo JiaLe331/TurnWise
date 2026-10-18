@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 26 26" fill="none">
+  <style>.stand{stroke:#1b2733}@media (prefers-color-scheme:dark){.stand{stroke:#e8ecef}}</style>
+  <path class="stand" d="M7 23h12M13 23V9" stroke-width="2" stroke-linecap="round"/>
+  <path d="M13 3.5v6.5l7-3.2z" fill="#2d7d4f"/>
+</svg>
