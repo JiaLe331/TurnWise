@@ -8,7 +8,7 @@ or declines in the UI, and the client sends the outcome back as the tool's outpu
 import json
 import logging
 import uuid
-from collections.abc import Iterator
+from collections.abc import Generator, Iterator
 from datetime import datetime, timedelta
 
 from turnwise import gemini
@@ -245,6 +245,37 @@ def _sse(chunk: dict | str) -> str:
     return f"data: {chunk if isinstance(chunk, str) else json.dumps(chunk, default=str)}\n\n"
 
 
+NUDGE = "Answer the manager now in 2 to 4 short sentences, using only the results above."
+
+
+def _ask(contents: list, config) -> Generator[str, None, tuple[str, list, bool]]:
+    """One model turn with key and model fallback: streams text chunks, returns
+    (text, calls, failed)."""
+    text_id, text, calls = None, "", []
+    for model, key in gemini.candidates():
+        try:
+            for event in _stream_model(model, key, contents, config):
+                if event[0] == "text":
+                    if text_id is None:
+                        text_id = uuid.uuid4().hex
+                        yield _sse({"type": "text-start", "id": text_id})
+                    text += event[1]
+                    yield _sse({"type": "text-delta", "id": text_id, "delta": event[1]})
+                else:
+                    calls.append(event)
+            break
+        except Exception as err:  # noqa: BLE001 - any provider failure falls through
+            gemini.give_up_on(model, key, err)
+            log.warning("assistant %s %s failed: %s", model, gemini.key_label(key), str(err)[:160])
+            if text_id is not None or calls:
+                break  # output already started; don't replay it from another model
+    else:
+        return text, calls, True
+    if text_id is not None:
+        yield _sse({"type": "text-end", "id": text_id})
+    return text, calls, False
+
+
 def chat_stream(ctx: Context, messages: list[dict], end: datetime) -> Iterator[str]:
     from google.genai import types
 
@@ -258,6 +289,7 @@ def chat_stream(ctx: Context, messages: list[dict], end: datetime) -> Iterator[s
         yield _sse({"type": "finish"})
         yield _sse("[DONE]")
         return
+    said = proposed = False
     for step in range(MAX_TOOL_STEPS + 1):
         config = types.GenerateContentConfig(
             system_instruction=SYSTEM,
@@ -268,33 +300,12 @@ def chat_stream(ctx: Context, messages: list[dict], end: datetime) -> Iterator[s
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         )
         yield _sse({"type": "start-step"})
-        text_id, text, calls, failed = None, "", [], True
-        for model, key in gemini.candidates():
-            try:
-                for event in _stream_model(model, key, contents, config):
-                    if event[0] == "text":
-                        if text_id is None:
-                            text_id = uuid.uuid4().hex
-                            yield _sse({"type": "text-start", "id": text_id})
-                        text += event[1]
-                        yield _sse({"type": "text-delta", "id": text_id, "delta": event[1]})
-                    else:
-                        calls.append(event)
-                failed = False
-                break
-            except Exception as err:  # noqa: BLE001 - any provider failure falls through
-                gemini.give_up_on(model, key, err)
-                log.warning(
-                    "assistant %s %s failed: %s", model, gemini.key_label(key), str(err)[:160]
-                )
-                if text_id is not None or calls:
-                    break  # output already started; don't replay it from another model
+        text, calls, failed = yield from _ask(contents, config)
         if failed:
             yield _sse({"type": "error", "errorText": BUSY})
             yield _sse("[DONE]")
             return
-        if text_id is not None:
-            yield _sse({"type": "text-end", "id": text_id})
+        said = said or bool(text)
 
         model_parts = [types.Part(text=text)] if text else []
         responses, stop = [], False
@@ -309,7 +320,7 @@ def chat_stream(ctx: Context, messages: list[dict], end: datetime) -> Iterator[s
                 }
             )
             if name == "propose_action":
-                stop = True
+                stop = proposed = True
                 continue
             try:
                 output = run_tool(ctx, name, args, end)
@@ -331,5 +342,16 @@ def chat_stream(ctx: Context, messages: list[dict], end: datetime) -> Iterator[s
             break
         contents.append(types.Content(role="model", parts=model_parts))
         contents.append(types.Content(role="user", parts=responses))
+    # Lookups ran out (or the model went quiet) before a word was written: ask once for the answer.
+    if not said and not proposed:
+        contents.append(types.Content(role="user", parts=[types.Part(text=NUDGE)]))
+        config = types.GenerateContentConfig(system_instruction=SYSTEM, temperature=0.2)
+        yield _sse({"type": "start-step"})
+        _, _, failed = yield from _ask(contents, config)
+        if failed:
+            yield _sse({"type": "error", "errorText": BUSY})
+            yield _sse("[DONE]")
+            return
+        yield _sse({"type": "finish-step"})
     yield _sse({"type": "finish"})
     yield _sse("[DONE]")

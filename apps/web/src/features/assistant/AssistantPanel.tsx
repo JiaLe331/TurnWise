@@ -63,7 +63,9 @@ export function AssistantPanel({ className }: { className?: string }) {
   useEffect(() => {
     const last = messages.at(-1)
     if (wasBusy.current && status === 'ready' && readAloud && last?.role === 'assistant') {
-      const text = textOf(last)
+      // A proposal can arrive without a written answer; read the card instead of staying silent.
+      const proposal = last.parts.filter((p) => p.type === 'tool-propose_action').at(-1)
+      const text = textOf(last) || (proposal?.input ? `I suggest: ${proposal.input.title}. ${proposal.input.reason}` : '')
       if (text) speak(text)
     }
     wasBusy.current = busy

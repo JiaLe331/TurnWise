@@ -232,3 +232,13 @@ def test_history_ending_on_an_answer_asks_the_model_nothing(client, model):
     out = chunks(post(client, [user("Why did parties wait?"), CHART_TURN]))
     assert model.calls == []
     assert [c["type"] for c in out] == ["start", "finish"]
+
+
+def test_silent_answer_after_the_lookups_run_out_is_asked_for_again(client, model):
+    model.steps = [[("call", "get_floor_now", {})]] * 5 + [[], [("text", "T4 needs clearing.")]]
+    out = chunks(post(client, [user("Which table is slowing us down?")]))
+    assert "".join(c.get("delta", "") for c in out) == "T4 needs clearing."
+    assert len(model.calls) == 7
+    last = model.calls[6][1][-1]
+    assert last.role == "user" and "Answer" in last.parts[0].text
+    assert [c["type"] for c in out][-1] == "finish"
