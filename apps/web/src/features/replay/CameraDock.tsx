@@ -1,5 +1,5 @@
-import { ArrowLeftRight, ChevronDown, ChevronUp, Pause, Play, RotateCcw, Sparkles, UserRound, Wand2 } from 'lucide-react'
-import { useState, type CSSProperties } from 'react'
+import { ArrowLeftRight, ChevronDown, ChevronUp, Maximize2, Minimize2, Pause, Play, RotateCcw, Sparkles, UserRound, Wand2 } from 'lucide-react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { Button } from '@/components/ui/button'
 import type { Narration } from '@/features/demo/api'
 import { SPEEDS, VideoPanel } from '@/features/demo/VideoPanel'
@@ -125,19 +125,32 @@ interface CameraDockProps {
 export function CameraDock({ variant, style, className, onSwap, onOpenManager }: CameraDockProps) {
   const replay = useReplay()
   const [collapsed, setCollapsed] = useState(false)
+  // Zoom restyles this same element as an overlay: moving the <video> would restart the demo clock.
+  const [zoomed, setZoomed] = useState(false)
+  useEffect(() => {
+    if (!zoomed) return
+    const close = (e: KeyboardEvent) => e.key === 'Escape' && setZoomed(false)
+    window.addEventListener('keydown', close)
+    return () => window.removeEventListener('keydown', close)
+  }, [zoomed])
   if (!replay.session) return null
-  const rail = variant === 'rail'
-  const strip = variant === 'strip'
+  const rail = variant === 'rail' && !zoomed
+  const strip = variant === 'strip' && !zoomed
+  const large = variant === 'full' || zoomed
   const latest = replay.narration[replay.narration.length - 1]
 
   return (
+    <>
+    {zoomed ? <div className="fixed inset-0 z-40 bg-ink/60" onClick={() => setZoomed(false)} aria-hidden /> : null}
     <section
       aria-label="Camera 02, recorded replay"
       className={cn(
         'flex flex-col overflow-hidden rounded-[var(--radius-panel)] border border-rule bg-white shadow-[var(--shadow-float)]',
-        className,
+        zoomed
+          ? 'fixed top-1/2 left-1/2 z-50 w-[min(calc(100vw-32px),calc((100dvh-108px)*16/9))] -translate-x-1/2 -translate-y-1/2'
+          : className,
       )}
-      style={rail ? { height: RAIL_DOCK_HEIGHT, ...style } : style}
+      style={zoomed ? undefined : rail ? { height: RAIL_DOCK_HEIGHT, ...style } : style}
     >
       <div className="flex h-11 shrink-0 items-center gap-1.5 border-b border-rule px-2">
         <div role="radiogroup" aria-label="Replay mode" className="flex rounded-lg bg-wash p-0.5">
@@ -191,7 +204,7 @@ export function CameraDock({ variant, style, className, onSwap, onOpenManager }:
         ) : (
           <>
             <span className="flex-1" />
-            {onSwap ? (
+            {onSwap && !zoomed ? (
               <button
                 type="button"
                 onClick={onSwap}
@@ -204,8 +217,17 @@ export function CameraDock({ variant, style, className, onSwap, onOpenManager }:
             ) : null}
           </>
         )}
+        <button
+          type="button"
+          onClick={() => setZoomed(!zoomed)}
+          className="grid size-8 place-items-center rounded-lg text-ink hover:bg-wash"
+          aria-label={zoomed ? 'Exit zoom' : 'Zoom camera'}
+          title={zoomed ? 'Exit zoom (Esc)' : 'Zoom camera'}
+        >
+          {zoomed ? <Minimize2 className="size-4" aria-hidden /> : <Maximize2 className="size-4" aria-hidden />}
+        </button>
       </div>
-      <div className={cn('relative shrink-0 bg-black', collapsed && 'h-0 overflow-hidden')}>
+      <div className={cn('relative shrink-0 bg-black', collapsed && !zoomed && 'h-0 overflow-hidden')}>
         {replay.timeline ? (
           <VideoPanel
             key={replay.session.session_id}
@@ -219,16 +241,16 @@ export function CameraDock({ variant, style, className, onSwap, onOpenManager }:
             onEnded={() => replay.setEnded(true)}
             onRestart={replay.restart}
             timeScale={replay.session.time_scale}
-            chrome={variant === 'full' ? 'full' : 'minimal'}
+            chrome={large ? 'full' : 'minimal'}
           />
         ) : (
           <div className="grid aspect-video place-items-center text-[13px] text-white/70">Loading the replay</div>
         )}
-        {variant === 'full' ? <Caption narration={replay.narration} media={replay.mediaNow} /> : null}
+        {large ? <Caption narration={replay.narration} media={replay.mediaNow} /> : null}
         {replay.ended ? (
           <div className="absolute inset-0 grid place-items-center bg-black/65 p-3 text-center text-white">
             <div>
-              <p className={cn('m-0 mb-1 font-bold', variant === 'full' ? 'text-[20px]' : 'text-[16px]')}>That was the shift.</p>
+              <p className={cn('m-0 mb-1 font-bold', large ? 'text-[20px]' : 'text-[16px]')}>That was the shift.</p>
               <p className="m-0 mb-3 text-[13px] text-white/80">See the briefing and timings, or run it again.</p>
               <div className="flex flex-wrap justify-center gap-2">
                 <Button tone="primary" size="sm" onClick={onOpenManager}>
@@ -247,5 +269,6 @@ export function CameraDock({ variant, style, className, onSwap, onOpenManager }:
       {rail ? <Transport /> : null}
       {rail || (strip && !collapsed) ? <Caption narration={replay.narration} media={replay.mediaNow} below /> : null}
     </section>
+    </>
   )
 }
