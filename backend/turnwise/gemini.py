@@ -11,8 +11,12 @@ import time
 from pydantic import BaseModel
 
 log = logging.getLogger("turnwise.gemini")
-# Pinned after the crop benchmark; later entries are fallbacks with separate free-tier quotas.
-DEFAULT_MODELS = "gemini-2.5-flash,gemini-3.1-flash-lite,gemini-2.5-flash-lite,gemini-flash-latest"
+# Pinned after the crop benchmark; later entries are fallbacks with separate free-tier quotas
+# (20 requests a day per model on the free tier), so a long list keeps the demo answering.
+DEFAULT_MODELS = (
+    "gemini-2.5-flash,gemini-3.5-flash,gemini-3.6-flash,gemini-flash-latest,"
+    "gemini-3.5-flash-lite,gemini-flash-lite-latest,gemini-3.1-flash-lite"
+)
 TIMEOUT_S = 30
 ATTEMPTS_PER_MODEL = 2
 
@@ -64,5 +68,7 @@ def generate[T: BaseModel](contents: list, schema: type[T]) -> tuple[T, str]:
             except Exception as err:  # noqa: BLE001 - any provider failure falls through
                 last = err
                 log.warning("Gemini %s attempt %d failed: %s", model, attempt + 1, str(err)[:120])
+                if "RESOURCE_EXHAUSTED" in str(err):
+                    break  # quota spent; a retry can't succeed, try the next model
             time.sleep(1.5 * (attempt + 1))
     raise GeminiUnavailable(f"All Gemini models failed: {str(last)[:200]}")

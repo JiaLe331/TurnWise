@@ -152,8 +152,9 @@ def _text(message: dict) -> str:
 
 
 def _history(messages: list[dict], types) -> list:
-    """Past turns as plain text. Only the current request's loop uses native function calls, so
-    thought signatures from earlier requests are never needed."""
+    """Past turns as plain prose. Only the current request's loop uses native function calls, so
+    thought signatures from earlier requests are never needed. Lookups and charts are left out:
+    the model copies any marker it sees in its own past turns back as text."""
     contents = []
     for m in messages:
         if m.get("role") == "user":
@@ -167,13 +168,11 @@ def _history(messages: list[dict], types) -> list:
                 lines.append(p["text"])
             elif kind == "tool-propose_action":
                 title = (p.get("input") or {}).get("title", "an action")
-                lines.append(f"[proposed: {title}]")
+                lines.append(f"I proposed: {title}.")
                 if out := p.get("output"):
                     outcomes.append(
-                        f"[manager on '{title}': {out.get('status')}: {out.get('detail', '')}]"
+                        f"Manager's answer to '{title}': {out.get('status')}. {out.get('detail', '')}"
                     )
-            elif kind.startswith("tool-"):
-                lines.append(f"[looked up {kind[5:]}]")
         if lines:
             contents.append(types.Content(role="model", parts=[types.Part(text="\n".join(lines))]))
         if outcomes:
@@ -254,6 +253,11 @@ def chat_stream(ctx: Context, messages: list[dict], end: datetime) -> Iterator[s
     # No messageId: the client keeps its own, so a continuation after a confirmed proposal
     # extends the same assistant message instead of starting a copy.
     yield _sse({"type": "start"})
+    # The last turn is already answered (a stale client resending after a chart): nothing to ask.
+    if not contents or contents[-1].role == "model":
+        yield _sse({"type": "finish"})
+        yield _sse("[DONE]")
+        return
     for step in range(MAX_TOOL_STEPS + 1):
         config = types.GenerateContentConfig(
             system_instruction=SYSTEM,

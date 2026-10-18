@@ -14,6 +14,20 @@ import type { AssistantMessage, ProposalOutcome } from './types'
 const SUGGESTIONS = ['How did tonight go?', 'What should we change?', 'Why did parties wait?']
 const MAX_LENGTH = 500
 
+/**
+ * Continue only once the manager has answered a proposal. Server tools (lookups, charts) arrive
+ * with their results, so resending after those would ask the model about its own finished answer.
+ */
+function proposalAnswered({ messages }: { messages: AssistantMessage[] }): boolean {
+  const last = messages.at(-1)
+  if (last?.role !== 'assistant') return false
+  const step = last.parts.slice(last.parts.map((p) => p.type).lastIndexOf('step-start') + 1)
+  return (
+    step.some((p) => p.type === 'tool-propose_action' && p.state === 'output-available') &&
+    lastAssistantMessageIsCompleteWithToolCalls({ messages })
+  )
+}
+
 function textOf(message: AssistantMessage): string {
   return message.parts.map((p) => (p.type === 'text' ? p.text : '')).join('').trim()
 }
@@ -34,7 +48,7 @@ export function AssistantPanel({ className }: { className?: string }) {
         }
       },
     }),
-    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
+    sendAutomaticallyWhen: proposalAnswered,
   })
   const busy = status === 'submitted' || status === 'streaming'
   const [readAloud, setReadAloud] = useReadAloud()

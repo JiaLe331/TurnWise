@@ -225,3 +225,34 @@ def test_gemini_leftovers_pause_recommendation_until_verified(services, clock, k
     rec = services.seating.recommend()
     assert "T6" not in [t.table_id for t in rec.tables]
     assert any("Gemini" in s.reason for s in rec.skipped) or rec.tables
+
+
+def test_exhausted_quota_moves_to_the_next_model_without_retrying(monkeypatch):
+    from pydantic import BaseModel
+
+    from turnwise import gemini
+
+    class Out(BaseModel):
+        ok: bool
+
+    tried = []
+
+    class Models:
+        def generate_content(self, model, contents, config):
+            tried.append(model)
+            if model == "spent":
+                raise RuntimeError("429 RESOURCE_EXHAUSTED. You exceeded your current quota")
+            return type("R", (), {"parsed": Out(ok=True)})()
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test")
+    monkeypatch.setenv("TURNWISE_GEMINI_MODELS", "spent,fresh")
+    monkeypatch.setattr(gemini, "_get_client", lambda: type("C", (), {"models": Models()})())
+    monkeypatch.setattr(gemini.time, "sleep", lambda s: None)
+    assert gemini.generate([], Out) == (Out(ok=True), "fresh")
+    assert tried == ["spent", "fresh"]
+
+
+def test_default_models_skip_retired_ones():
+    from turnwise import gemini
+
+    assert "gemini-2.5-flash-lite" not in gemini.DEFAULT_MODELS

@@ -193,3 +193,42 @@ def test_bad_tool_arguments_become_an_error_result(client, model):
     result = next(c for c in out if c["type"] == "tool-output-available")
     assert "error" in result["output"]
     assert [c["type"] for c in out][-1] == "finish"
+
+
+CHART_TURN = {
+    "id": "a1",
+    "role": "assistant",
+    "parts": [
+        {"type": "step-start"},
+        {
+            "type": "tool-get_shift_metrics",
+            "toolCallId": "c1",
+            "state": "output-available",
+            "input": {},
+            "output": {},
+        },
+        {"type": "text", "text": "Queue wait was 59 seconds."},
+        {
+            "type": "tool-show_chart",
+            "toolCallId": "c2",
+            "state": "output-available",
+            "input": {"title": "Median times", "unit": "seconds", "bars": []},
+            "output": {"title": "Median times", "unit": "seconds", "bars": []},
+        },
+    ],
+}
+
+
+def test_history_has_no_tool_markers_for_the_model_to_copy(client, model):
+    model.steps = [[("text", "Fine.")]]
+    chunks(post(client, [user("Why did parties wait?"), CHART_TURN, user("And now?", 2)]))
+    texts = [p.text for c in model.calls[0][1] for p in c.parts if p.text]
+    assert not [t for t in texts if "[" in t]
+    assert any("59 seconds" in t for t in texts)
+
+
+def test_history_ending_on_an_answer_asks_the_model_nothing(client, model):
+    model.steps = [[("text", "[looked up show_chart]")]]
+    out = chunks(post(client, [user("Why did parties wait?"), CHART_TURN]))
+    assert model.calls == []
+    assert [c["type"] for c in out] == ["start", "finish"]
